@@ -5,3 +5,5 @@
 #include <SDL3/SDL.h>
 
 #include <string>
+
+#pragma comment(lib, "SDL3.lib")

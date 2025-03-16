@@ -6,19 +6,32 @@ class GoreMain {
 public:
 	GoreMain(std::string title) {
 		_title = title;
+		_gWindow = GoreWindow();
 	}
 
 	void Init() {
-		gWindow = GoreWindow();
+		_gWindow.Init(_title, 640, 480);
+	}
 
-		gWindow.Init(_title, 640, 480);
+	void Run() {
+		SDL_Event e;
+
+		bool quit = false;
+
+		while (!quit) {
+			while (SDL_PollEvent(&e)) {
+				if (e.type == SDL_EVENT_QUIT) {
+					quit = true;
+				}
+			}
+		}
 	}
 
 	void Shutdown() {
-		gWindow.Close();
+		_gWindow.Close();
 	}
 private:
 	std::string _title;
 
-	GoreWindow gWindow;
+	GoreWindow _gWindow;
 };
