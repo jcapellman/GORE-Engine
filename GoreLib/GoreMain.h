@@ -1,6 +1,7 @@
 #pragma once
 #include "framework.h"
 #include "GoreWindow.h"
+#include "GoreConfig.h"
 
 class GoreMain {
 public:
@@ -9,8 +10,10 @@ public:
 		_gWindow = GoreWindow();
 	}
 
-	void Init() {
-		_gWindow.Init(_title, 640, 480);
+	void Init(const std::string& configFileName = DEFAULT_CONFIG_FILENAME) {
+		_gConfig = GoreConfig(configFileName);
+
+		_gWindow.Init(_title, _gConfig.GetIntValue(GoreConfigKeys::R_SCREEN_WIDTH), _gConfig.GetIntValue(GoreConfigKeys::R_SCREEN_WIDTH));
 	}
 
 	void Run() {
@@ -30,8 +33,13 @@ public:
 	void Shutdown() {
 		_gWindow.Close();
 	}
+
+	~GoreMain() {
+		Shutdown();
+	}
 private:
 	std::string _title;
 
 	GoreWindow _gWindow;
+	GoreConfig _gConfig;
 };
