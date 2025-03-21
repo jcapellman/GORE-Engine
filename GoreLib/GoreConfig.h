@@ -1,5 +1,11 @@
 #pragma once
 
+constexpr auto DEFAULT_R_SCREEN_WIDTH = "720";
+constexpr auto DEFAULT_R_SCREEN_HEIGHT = "480";
+constexpr auto DEFAULT_R_BPP = "16";
+constexpr auto DEFAULT_S_VOLUME = "100";
+constexpr auto DEFAULT_S_MUSIC_VOLUME = "100";
+
 enum GoreConfigKeys {
     R_SCREEN_WIDTH,  // Resolution width
     R_SCREEN_HEIGHT, // Resolution height
@@ -64,34 +70,30 @@ public:
     }
 
     void LoadDefaults() {
-        _mapConfig[enum_to_string(GoreConfigKeys::R_SCREEN_WIDTH)] = "720";
-        _mapConfig[enum_to_string(GoreConfigKeys::R_SCREEN_HEIGHT)] = "480";
-        _mapConfig[enum_to_string(GoreConfigKeys::R_BPP)] = "16";
+        _mapConfig[enum_to_string(GoreConfigKeys::R_SCREEN_WIDTH)] = DEFAULT_R_SCREEN_WIDTH;
+        _mapConfig[enum_to_string(GoreConfigKeys::R_SCREEN_HEIGHT)] = DEFAULT_R_SCREEN_WIDTH;
+        _mapConfig[enum_to_string(GoreConfigKeys::R_BPP)] = DEFAULT_R_BPP;
+        _mapConfig[enum_to_string(GoreConfigKeys::S_VOLUME)] = DEFAULT_S_VOLUME;
+        _mapConfig[enum_to_string(GoreConfigKeys::S_MUSIC_VOLUME)] = DEFAULT_S_MUSIC_VOLUME;
     }
 
 private:
     std::string enum_to_string(GoreConfigKeys configKey) {
-        std::string key;
+        static const std::map<GoreConfigKeys, std::string> enumToStringMap = {
+            {R_SCREEN_WIDTH, "R_SCREEN_WIDTH"},
+            {R_SCREEN_HEIGHT, "R_SCREEN_HEIGHT"},
+            {R_BPP, "R_BPP"},
+            {S_VOLUME, "S_VOLUME"},
+            {S_MUSIC_VOLUME, "S_MUSIC_VOLUME"}
+        };
 
-        switch (configKey) {
-        case R_SCREEN_WIDTH:
-            key = "R_SCREEN_WIDTH";
-            break;
-        case R_SCREEN_HEIGHT:
-            key = "R_SCREEN_HEIGHT";
-            break;
-        case R_BPP:
-            key = "R_BPP";
-            break;
-        case S_VOLUME:
-            key = "S_VOLUME";
-            break;
-        case S_MUSIC_VOLUME:
-            key = "S_MUSIC_VOLUME";
-            break;
+        auto it = enumToStringMap.find(configKey);
+
+        if (it != enumToStringMap.end()) {
+            return it->second;
         }
 
-        return key;
+        throw std::runtime_error("Invalid GoreConfigKey");
     }
 
 	std::map<std::string, std::string> _mapConfig;
