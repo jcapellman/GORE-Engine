@@ -4,11 +4,11 @@
 
 class GoreTexture {
 public:
-	GoreTexture(std::string fileName);
+	GoreTexture(std::string fileName, SDL_Renderer * renderer);
 
 	~GoreTexture();
 
-	SDL_Surface* Get();
+	SDL_Texture * Get();
 private:
-	SDL_Surface* _texture;
+	SDL_Texture * _texture;
 };

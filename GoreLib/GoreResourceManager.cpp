@@ -2,8 +2,9 @@
 #include "GoreResourceManager.h"
 #include <SDL3_image/SDL_image.h>
 
-GoreResourceManager::GoreResourceManager(std::string baseFolderName) {
+GoreResourceManager::GoreResourceManager(std::string baseFolderName, SDL_Renderer * renderer) {
     _baseFolderName = baseFolderName;
+	_renderer = renderer;
 }
 
 GoreResourceManager::~GoreResourceManager() {
@@ -19,7 +20,7 @@ void GoreResourceManager::LoadResource(RESOURCE_TYPES resourceType, std::string 
 
     switch (resourceType) {
     case TEXTURE:
-        GoreTexture texture = GoreTexture(filePath.string());
+        GoreTexture texture = GoreTexture(filePath.string(), _renderer);
         _textures.insert(std::make_pair(key, texture));
         break;
     }
