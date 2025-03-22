@@ -2,12 +2,13 @@
 #include "framework.h"
 #include "GoreWindow.h"
 #include "GoreConfig.h"
+#include "GoreResourceManager.h"
 
 class GoreMain {
 public:
 	GoreMain(std::string title);
 
-	void Init(const std::string& configFileName = DEFAULT_CONFIG_FILENAME);
+	void Init(const std::string& configFileName = DEFAULT_CONFIG_FILENAME, const std::string& gameName = DEFAULT_GAME_NAME);
 
 	void Run();
 
@@ -19,4 +20,5 @@ private:
 
 	GoreWindow _gWindow;
 	GoreConfig _gConfig;
+	std::unique_ptr<GoreResourceManager> _gResourceManager;
 };

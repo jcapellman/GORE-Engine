@@ -9,5 +9,7 @@
 #include <string>
 #include <map>
 #include <stdexcept>
+#include <filesystem>
 
 const std::string DEFAULT_CONFIG_FILENAME = "config.cfg";
+const std::string DEFAULT_GAME_NAME = "base";
