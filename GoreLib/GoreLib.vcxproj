@@ -206,16 +206,20 @@
   <ItemGroup>
     <ClInclude Include="framework.h" />
     <ClInclude Include="GoreConfig.h" />
+    <ClInclude Include="GoreGameState.h" />
     <ClInclude Include="GoreMain.h" />
     <ClInclude Include="GoreResourceManager.h" />
+    <ClInclude Include="GoreScreen.h" />
     <ClInclude Include="GoreTexture.h" />
     <ClInclude Include="GoreWindow.h" />
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="GoreConfig.cpp" />
+    <ClCompile Include="GoreGameState.cpp" />
     <ClCompile Include="GoreMain.cpp" />
     <ClCompile Include="GoreResourceManager.cpp" />
+    <ClCompile Include="GoreScreen.cpp" />
     <ClCompile Include="GoreTexture.cpp" />
     <ClCompile Include="GoreWindow.cpp" />
     <ClCompile Include="pch.cpp">
