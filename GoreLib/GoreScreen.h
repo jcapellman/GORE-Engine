@@ -3,8 +3,9 @@
 
 class GoreScreen {
 public:
-	GoreScreen();
-	~GoreScreen();
-private:
-
+    virtual ~GoreScreen() = default;
+    virtual void LoadResources() = 0;
+    virtual void UnloadResources() = 0;
+    virtual void Update() = 0;
+    virtual void Render() = 0;
 };

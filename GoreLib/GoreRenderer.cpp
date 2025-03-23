@@ -3,6 +3,7 @@
 
 GoreRenderer::GoreRenderer(GoreWindow& window) {
     _renderer = SDL_CreateRenderer(window.Get(), NULL);
+
     if (!_renderer) {
         throw std::runtime_error("Failed to create renderer: " + std::string(SDL_GetError()));
     }

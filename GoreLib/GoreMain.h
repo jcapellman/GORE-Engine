@@ -4,6 +4,8 @@
 #include "GoreConfig.h"
 #include "GoreResourceManager.h"
 #include "GoreRenderer.h"
+#include "GoreGameState.h"
+#include "GoreScreen.h"
 
 class GoreMain {
 public:
@@ -16,11 +18,20 @@ public:
     void Shutdown();
 
     ~GoreMain();
+
+    void AddScreen(const std::string& name, std::unique_ptr<GoreScreen> screen);
 private:
+    void HandleEvents();
+    void Update();
+    void Render();
+
+    bool _isRunning;
+
     std::string _title;
 
     GoreWindow _gWindow;
     GoreConfig _gConfig;
     std::unique_ptr<GoreResourceManager> _gResourceManager;
     std::unique_ptr<GoreRenderer> _gRenderer;
+	GoreGameState _gGameState;
 };

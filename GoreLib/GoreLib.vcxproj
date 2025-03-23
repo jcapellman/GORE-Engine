@@ -221,7 +221,6 @@
     <ClCompile Include="GoreMain.cpp" />
     <ClCompile Include="GoreRenderer.cpp" />
     <ClCompile Include="GoreResourceManager.cpp" />
-    <ClCompile Include="GoreScreen.cpp" />
     <ClCompile Include="GoreTexture.cpp" />
     <ClCompile Include="GoreWindow.cpp" />
     <ClCompile Include="pch.cpp">

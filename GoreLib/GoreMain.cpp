@@ -15,20 +15,20 @@ void GoreMain::Init(const std::string& configFileName, const std::string& gameNa
 }
 
 void GoreMain::Run() {
+    while (_isRunning) {
+        HandleEvents();
+        Update();
+        Render();
+    }
+}
+
+void GoreMain::HandleEvents() {
     SDL_Event e;
 
-    bool quit = false;
-
-    while (!quit) {
-        while (SDL_PollEvent(&e)) {
-            if (e.type == SDL_EVENT_QUIT) {
-                quit = true;
-            }
+    while (SDL_PollEvent(&e)) {
+        if (e.type == SDL_EVENT_QUIT) {
+            _isRunning = false;
         }
-
-        _gRenderer->Clear();
-        // Render your textures here using _gRenderer->GetRenderer()
-        _gRenderer->Present();
     }
 }
 
@@ -38,4 +38,16 @@ void GoreMain::Shutdown() {
 
 GoreMain::~GoreMain() {
     Shutdown();
+}
+
+void GoreMain::Update() {
+    _gGameState.Update();
+}
+
+void GoreMain::Render() {
+    _gGameState.Render();
+}
+
+void GoreMain::AddScreen(const std::string& name, std::unique_ptr<GoreScreen> screen) {
+    _gGameState.AddScreen(name, std::move(screen));
 }
