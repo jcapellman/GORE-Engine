@@ -4,9 +4,13 @@
 void GoreWindow::Init(std::string windowTitle, unsigned int width, unsigned int height) {
 	SDL_Init(SDL_INIT_VIDEO);
 
-	window = SDL_CreateWindow(windowTitle.c_str(), width, height, 0);
+	_window = SDL_CreateWindow(windowTitle.c_str(), width, height, 0);
 }
 
 void GoreWindow::Close() {
-	SDL_DestroyWindow(window);
+	SDL_DestroyWindow(_window);
+}
+
+SDL_Window* GoreWindow::GetWindow() const {
+	return _window;
 }

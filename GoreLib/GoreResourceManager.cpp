@@ -2,7 +2,7 @@
 #include "GoreResourceManager.h"
 #include <SDL3_image/SDL_image.h>
 
-GoreResourceManager::GoreResourceManager(std::string baseFolderName, SDL_Renderer * renderer) {
+GoreResourceManager::GoreResourceManager(std::string baseFolderName, GoreRenderer renderer) {
     _baseFolderName = baseFolderName;
 	_renderer = renderer;
 }

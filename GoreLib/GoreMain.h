@@ -3,6 +3,7 @@
 #include "GoreWindow.h"
 #include "GoreConfig.h"
 #include "GoreResourceManager.h"
+#include "GoreRenderer.h"
 
 class GoreMain {
 public:
@@ -20,5 +21,7 @@ private:
 
 	GoreWindow _gWindow;
 	GoreConfig _gConfig;
+
 	std::unique_ptr<GoreResourceManager> _gResourceManager;
+	std::unique_ptr<GoreRenderer> _gRenderer;
 };

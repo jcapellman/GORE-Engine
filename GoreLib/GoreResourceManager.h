@@ -8,7 +8,7 @@ enum RESOURCE_TYPES {
 
 class GoreResourceManager {
 public:
-	GoreResourceManager(std::string baseFolderName, SDL_Renderer * renderer);
+	GoreResourceManager(std::string baseFolderName, GoreRenderer renderer);
 
 	~GoreResourceManager();
 
@@ -18,5 +18,5 @@ public:
 private:
 	std::map<std::string, GoreTexture> _textures;
 	std::string _baseFolderName;
-	SDL_Renderer* _renderer;
+	GoreRenderer _renderer;
 };

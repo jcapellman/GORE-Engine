@@ -1,10 +1,11 @@
 #pragma once
 #include "framework.h"
 #include <SDL3_image/SDL_image.h>
+#include "GoreRenderer.h"
 
 class GoreTexture {
 public:
-	GoreTexture(std::string fileName, SDL_Renderer * renderer);
+	GoreTexture(std::string fileName, GoreRenderer renderer);
 
 	~GoreTexture();
 

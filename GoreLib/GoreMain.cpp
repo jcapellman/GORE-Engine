@@ -11,7 +11,9 @@ void GoreMain::Init(const std::string& configFileName, const std::string& gameNa
 
 	_gWindow.Init(_title, _gConfig.GetIntValue(GoreConfigKeys::R_SCREEN_WIDTH), _gConfig.GetIntValue(GoreConfigKeys::R_SCREEN_WIDTH));
 
-	_gResourceManager = std::make_unique<GoreResourceManager>(gameName);
+	_gRenderer = std::make_unique<GoreRenderer>(_gWindow);
+
+	_gResourceManager = std::make_unique<GoreResourceManager>(gameName, _gRenderer);
 }
 
 void GoreMain::Run() {
