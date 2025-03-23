@@ -5,7 +5,7 @@
 
 class GoreTexture {
 public:
-	GoreTexture(std::string fileName, GoreRenderer renderer);
+	GoreTexture(std::string fileName, GoreRenderer * renderer);
 
 	~GoreTexture();
 

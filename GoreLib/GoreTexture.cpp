@@ -1,14 +1,14 @@
 #include "pch.h"
 #include "GoreTexture.h"
 
-GoreTexture::GoreTexture(std::string fileName, GoreRenderer renderer) {
+GoreTexture::GoreTexture(std::string fileName, GoreRenderer * renderer) {
     SDL_Surface * surface = IMG_Load(fileName.c_str());
 
     if (!surface) {
         throw std::runtime_error("Failed to load image: " + fileName);
     }
 
-    _texture = SDL_CreateTextureFromSurface(renderer.GetRenderer(), surface);
+    _texture = SDL_CreateTextureFromSurface(renderer->GetRenderer(), surface);
 
 	SDL_DestroySurface(surface);
 

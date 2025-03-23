@@ -7,21 +7,20 @@
 
 class GoreMain {
 public:
-	GoreMain(std::string title);
+    GoreMain(const std::string& title);
 
-	void Init(const std::string& configFileName = DEFAULT_CONFIG_FILENAME, const std::string& gameName = DEFAULT_GAME_NAME);
+    void Init(const std::string& configFileName = DEFAULT_CONFIG_FILENAME, const std::string& gameName = DEFAULT_GAME_NAME);
 
-	void Run();
+    void Run();
 
-	void Shutdown();
+    void Shutdown();
 
-	~GoreMain();
+    ~GoreMain();
 private:
-	std::string _title;
+    std::string _title;
 
-	GoreWindow _gWindow;
-	GoreConfig _gConfig;
-
-	std::unique_ptr<GoreResourceManager> _gResourceManager;
-	std::unique_ptr<GoreRenderer> _gRenderer;
+    GoreWindow _gWindow;
+    GoreConfig _gConfig;
+    std::unique_ptr<GoreResourceManager> _gResourceManager;
+    std::unique_ptr<GoreRenderer> _gRenderer;
 };

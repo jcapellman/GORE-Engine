@@ -7,7 +7,7 @@ public:
 
 	void Close();
 
-	SDL_Window* GetWindow() const;
+	SDL_Window* Get() const;
 private:
 	SDL_Window* _window;
 };

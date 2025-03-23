@@ -11,6 +11,6 @@ void GoreWindow::Close() {
 	SDL_DestroyWindow(_window);
 }
 
-SDL_Window* GoreWindow::GetWindow() const {
+SDL_Window* GoreWindow::Get() const {
 	return _window;
 }
