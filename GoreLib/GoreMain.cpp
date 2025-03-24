@@ -48,6 +48,6 @@ void GoreMain::Render() {
     _gGameState.Render();
 }
 
-void GoreMain::AddScreen(const std::string& name, std::unique_ptr<GoreScreen> screen) {
-    _gGameState.AddScreen(name, std::move(screen));
+void GoreMain::AddScreen(const std::string& name, std::unique_ptr<GoreScreen> screen, bool isActiveScreen) {
+    _gGameState.AddScreen(name, std::move(screen), isActiveScreen);
 }

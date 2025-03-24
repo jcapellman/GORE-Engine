@@ -19,13 +19,13 @@ public:
 
     ~GoreMain();
 
-    void AddScreen(const std::string& name, std::unique_ptr<GoreScreen> screen);
+    void AddScreen(const std::string& name, std::unique_ptr<GoreScreen> screen, bool isActiveScreen = false);
 private:
     void HandleEvents();
     void Update();
     void Render();
 
-    bool _isRunning;
+    bool _isRunning = true;
 
     std::string _title;
 

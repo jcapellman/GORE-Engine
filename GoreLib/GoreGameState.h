@@ -8,7 +8,7 @@ public:
 
     ~GoreGameState();
     
-    void AddScreen(const std::string& name, std::unique_ptr<GoreScreen> screen);
+    void AddScreen(const std::string& name, std::unique_ptr<GoreScreen> screen, bool isActiveScreen = false);
     void RemoveScreen(const std::string& name);
     void SetActiveScreen(const std::string& name);
 
