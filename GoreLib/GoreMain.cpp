@@ -26,9 +26,28 @@ void GoreMain::HandleEvents() {
     SDL_Event e;
 
     while (SDL_PollEvent(&e)) {
-        if (e.type == SDL_EVENT_QUIT) {
-            _isRunning = false;
+        GoreEvent event = GoreEvent::NONE;
+
+        switch (e.type) {
+        case SDLK_UP:
+            event = GoreEvent::KEY_UP;
+            break;
+        case SDLK_DOWN:
+            event = GoreEvent::KEY_DOWN;
+            break;
+        case SDLK_ESCAPE:
+            event = GoreEvent::KEY_ESCAPE;
+            break;
+        case SDLK_KP_ENTER:
+            event = GoreEvent::KEY_ENTER;
+            break;
         }
+    
+        if (event == GoreEvent::NONE) {
+            return;
+        }
+
+        _gGameState.HandleEvents(event);
     }
 }
 

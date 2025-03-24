@@ -25,6 +25,12 @@ void GoreGameState::SetActiveScreen(const std::string& name) {
     }
 }
 
+void GoreGameState::HandleEvents(GoreEvent event) {
+    if (_activeScreen) {
+        _activeScreen->HandleEvents(event);
+    }
+}
+
 void GoreGameState::Update() {
     if (_activeScreen) {
         _activeScreen->Update();

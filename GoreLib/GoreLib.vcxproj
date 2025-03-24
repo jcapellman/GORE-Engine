@@ -206,6 +206,7 @@
   <ItemGroup>
     <ClInclude Include="framework.h" />
     <ClInclude Include="GoreConfig.h" />
+    <ClInclude Include="GoreEvent.h" />
     <ClInclude Include="GoreGameState.h" />
     <ClInclude Include="GoreMain.h" />
     <ClInclude Include="GoreRenderer.h" />

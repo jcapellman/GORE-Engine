@@ -1,6 +1,7 @@
 #pragma once
 #include "framework.h"
 #include "GoreScreen.h"
+#include "GoreEvent.h"
 
 class GoreGameState {
 public:
@@ -12,6 +13,7 @@ public:
     void RemoveScreen(const std::string& name);
     void SetActiveScreen(const std::string& name);
 
+    void HandleEvents(GoreEvent event);
     void Update();
     void Render();
 
