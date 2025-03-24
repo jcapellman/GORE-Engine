@@ -9,12 +9,8 @@ GoreGameState::~GoreGameState() {
 }
 
 
-void GoreGameState::AddScreen(const std::string& name, std::unique_ptr<GoreScreen> screen, bool isActiveScreen) {
+void GoreGameState::AddScreen(const std::string& name, std::unique_ptr<GoreScreen> screen) {
     _screens[name] = std::move(screen);
-
-    if (isActiveScreen) {
-		SetActiveScreen(name);
-    }
 }
 
 void GoreGameState::RemoveScreen(const std::string& name) {
