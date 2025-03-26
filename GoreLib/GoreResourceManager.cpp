@@ -18,7 +18,18 @@ void GoreResourceManager::LoadResource(RESOURCE_TYPES resourceType, const std::s
 
     switch (resourceType) {
     case TEXTURE:
-        _textures[key] = new GoreTexture(filePath.string(), _renderer);
+        SDL_Surface* surface = IMG_Load(fileName.c_str());
+
+        if (!surface) {
+            // Handle error
+            return;
+        }
+        
+        SDL_Texture * texture = SDL_CreateTextureFromSurface(_renderer->GetRenderer(), surface);
+
+        SDL_DestroySurface(surface);
+
+        _textures[key] = new GoreTexture(texture);
         break;
     }
 }

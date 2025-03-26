@@ -29,17 +29,28 @@ void GoreMain::HandleEvents() {
         GoreEvent event = GoreEvent::NONE;
 
         switch (e.type) {
-        case SDLK_UP:
-            event = GoreEvent::KEY_UP;
+        case SDL_EVENT_QUIT:
+            _isRunning = false;
             break;
-        case SDLK_DOWN:
-            event = GoreEvent::KEY_DOWN;
+        case SDL_EVENT_KEY_DOWN:
+            switch (e.key.key) {
+            case SDLK_UP:
+                event = GoreEvent::KEY_UP;
+                break;
+            case SDLK_DOWN:
+                event = GoreEvent::KEY_DOWN;
+                break;
+            case SDLK_ESCAPE:
+                event = GoreEvent::KEY_ESCAPE;
+                break;
+            case SDLK_RETURN:
+                event = GoreEvent::KEY_ENTER;
+                break;
+            default:
+                break;
+            }
             break;
-        case SDLK_ESCAPE:
-            event = GoreEvent::KEY_ESCAPE;
-            break;
-        case SDLK_KP_ENTER:
-            event = GoreEvent::KEY_ENTER;
+        default:
             break;
         }
     

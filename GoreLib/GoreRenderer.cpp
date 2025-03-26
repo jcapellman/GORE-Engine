@@ -2,15 +2,16 @@
 #include "GoreRenderer.h"
 
 GoreRenderer::GoreRenderer(GoreWindow& window) {
-    _renderer = SDL_CreateRenderer(window.Get(), NULL);
-
+    _renderer = SDL_CreateRenderer(window.Get(), "opengl");
     if (!_renderer) {
-        throw std::runtime_error("Failed to create renderer: " + std::string(SDL_GetError()));
+        // Handle error
     }
 }
 
 GoreRenderer::~GoreRenderer() {
-    SDL_DestroyRenderer(_renderer);
+    if (_renderer) {
+        SDL_DestroyRenderer(_renderer);
+    }
 }
 
 void GoreRenderer::Clear() {
@@ -19,6 +20,12 @@ void GoreRenderer::Clear() {
 
 void GoreRenderer::Present() {
     SDL_RenderPresent(_renderer);
+}
+
+void GoreRenderer::RenderTexture(GoreTexture* texture, const SDL_FRect* srcRect, const SDL_FRect* dstRect) {
+    if (texture && texture->Get()) {
+        SDL_RenderTexture(_renderer, texture->Get(), srcRect, dstRect);
+    }
 }
 
 SDL_Renderer* GoreRenderer::GetRenderer() const {
