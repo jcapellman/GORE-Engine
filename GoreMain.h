@@ -6,12 +6,13 @@
 #include "GoreRenderer.h"
 #include "GoreGameState.h"
 #include "GoreScreen.h"
+#include "GoreLogger.h"
 
 class GoreMain {
 public:
     GoreMain(const std::string& title);
 
-    void Init(const std::string& configFileName = DEFAULT_CONFIG_FILENAME, const std::string& gameName = DEFAULT_GAME_NAME);
+    void Init(const std::string& configFileName = DEFAULT_CONFIG_FILENAME, const std::string& gameName = DEFAULT_GAME_NAME, LOGLEVEL logLevel = DEFAULT_LOG_LEVEL);
 
     void Run();
 

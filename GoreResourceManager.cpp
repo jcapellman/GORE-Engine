@@ -49,7 +49,7 @@ void GoreResourceManager::LoadResource(RESOURCE_TYPES resourceType, const std::s
         SDL_Surface* surface = IMG_Load(filePath.string().c_str());
 
         if (!surface) {
-			GoreLogger::getInstance().log(ERROR, "Failed to load texture: " + filePath.string() + " - error: " + SDL_GetError());
+			GoreLogger::getInstance().log(ERR, "Failed to load texture: " + filePath.string() + " - error: " + SDL_GetError());
             
             return;
         }
@@ -57,7 +57,7 @@ void GoreResourceManager::LoadResource(RESOURCE_TYPES resourceType, const std::s
         SDL_Texture * texture = SDL_CreateTextureFromSurface(_renderer->GetRenderer(), surface);
 
         if (!texture) {
-            GoreLogger::getInstance().log(ERROR, "Failed to create texture from surface: " + filePath.string() + " Error: " + SDL_GetError());
+            GoreLogger::getInstance().log(ERR, "Failed to create texture from surface: " + filePath.string() + " Error: " + SDL_GetError());
 
             return;
         }

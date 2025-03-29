@@ -8,7 +8,7 @@ void GoreLogger::log(LOGLEVEL logLevel, const std::string& message) {
 	}
 	std::lock_guard<std::mutex> lock(mutex_);
 
-	std::ofstream logFile(DEFAULT_LOG_FILE, std::ios_base::app);
+	std::ofstream logFile(_logFilePath, std::ios_base::app);
 
 	if (!logFile.is_open()) {
 		std::cerr << "Failed to open log file." << std::endl;
@@ -33,10 +33,10 @@ void GoreLogger::log(LOGLEVEL logLevel, const std::string& message) {
 	case INFO:
 		logFile << "[INFO] ";
 		break;
-	case WARNING:
+	case WARN:
 		logFile << "[WARNING] ";
 		break;
-	case ERROR:
+	case ERR:
 		logFile << "[ERROR] ";
 		break;
 	default:
@@ -53,4 +53,10 @@ void GoreLogger::setLogLevel(LOGLEVEL logLevel) {
 	std::lock_guard<std::mutex> lock(mutex_);
 
 	_currentLogLevel = logLevel;
+}
+
+void GoreLogger::setGameRootFolder(const std::string& gameRootFolder) {
+	std::lock_guard<std::mutex> lock(mutex_);
+
+	_logFilePath = gameRootFolder + "/" + DEFAULT_LOG_FILE;
 }

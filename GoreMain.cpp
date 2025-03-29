@@ -1,11 +1,14 @@
 #include "pch.h"
 #include "GoreMain.h"
-#include "GoreLogger.h"
 
 GoreMain::GoreMain(const std::string& title) : _title(title), _gWindow() {
 }
 
-void GoreMain::Init(const std::string& configFileName, const std::string& gameName) {
+void GoreMain::Init(const std::string& configFileName, const std::string& gameName, LOGLEVEL logLevel) {
+    GoreLogger::getInstance().setGameRootFolder(gameName);
+
+    GoreLogger::getInstance().setLogLevel(logLevel);
+
 	GoreLogger::getInstance().log(INFO, "Initializing GoreMain with config file: " + configFileName + " and game name: " + gameName);
 
     _gConfig = GoreConfig(configFileName);
