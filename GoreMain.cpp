@@ -1,11 +1,17 @@
 #include "pch.h"
 #include "GoreMain.h"
+#include "GoreLogger.h"
 
 GoreMain::GoreMain(const std::string& title) : _title(title), _gWindow() {
 }
 
 void GoreMain::Init(const std::string& configFileName, const std::string& gameName) {
+	GoreLogger::getInstance().log(INFO, "Initializing GoreMain with config file: " + configFileName + " and game name: " + gameName);
+
     _gConfig = GoreConfig(configFileName);
+
+	GoreLogger::getInstance().log(INFO, "Config values: Screen Width: " + std::to_string(_gConfig.GetIntValue(GoreConfigKeys::R_SCREEN_WIDTH)) +
+		", Screen Height: " + std::to_string(_gConfig.GetIntValue(GoreConfigKeys::R_SCREEN_HEIGHT)));
 
     _gWindow.Init(_title, _gConfig.GetIntValue(GoreConfigKeys::R_SCREEN_WIDTH), _gConfig.GetIntValue(GoreConfigKeys::R_SCREEN_HEIGHT));
 
