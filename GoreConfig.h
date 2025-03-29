@@ -32,5 +32,7 @@ public:
 private:
     std::string enum_to_string(GoreConfigKeys configKey);
 
+    void SaveToFile(const std::string& fileName);
+
     std::map<std::string, std::string> _mapConfig;
 };

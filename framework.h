@@ -16,3 +16,4 @@
 
 const std::string DEFAULT_CONFIG_FILENAME = "config.cfg";
 const std::string DEFAULT_GAME_NAME = "base";
+const std::string DEFAULT_LOG_FILE = "gconsole.log";

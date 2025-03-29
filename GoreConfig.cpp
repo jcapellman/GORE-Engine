@@ -6,6 +6,9 @@ GoreConfig::GoreConfig(const std::string& fileName) {
 
     if (!file.is_open()) {
         LoadDefaults();
+
+        SaveToFile(fileName);
+
         return;
     }
 
@@ -19,6 +22,20 @@ GoreConfig::GoreConfig(const std::string& fileName) {
         std::string value = line.substr(delimiterPos + 1);
         _mapConfig[key] = value;
     }
+
+    file.close();
+}
+
+void GoreConfig::SaveToFile(const std::string & fileName) {
+	std::ofstream file(fileName);
+
+    if (!file.is_open()) {
+        throw std::runtime_error("Failed to open " + fileName + " to write the config");
+    }
+
+	for (const auto& pair : _mapConfig) {
+		file << pair.first << "=" << pair.second << std::endl;
+	}
 
     file.close();
 }
