@@ -17,8 +17,13 @@ public:
 	}
 
 	void log(LOGLEVEL logLevel, const std::string& message);
+
+	void setLogLevel(LOGLEVEL logLevel);
 private:
-	GoreLogger() = default;
+	GoreLogger() : _currentLogLevel(ERROR) {}
+
 	~GoreLogger() = default;
 	std::mutex mutex_;
+
+	LOGLEVEL _currentLogLevel;
 };
