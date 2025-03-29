@@ -18,6 +18,10 @@ public:
     GoreTexture* GetTexture(const std::string& key);
 
 private:
+    std::filesystem::path GetResourceFilePath(const std::string& fileName, RESOURCE_TYPES resourcetType, bool usingBaseFolder);
+
+    std::string GetResourceFolderFromEnum(RESOURCE_TYPES resourceType);
+
     std::map<std::string, GoreTexture*> _textures;
     std::string _baseFolderName;
     GoreRenderer* _renderer;
