@@ -1,33 +1,42 @@
-#include "pch.h"
 #include "GoreRenderer.h"
 
-GoreRenderer::GoreRenderer(GoreWindow& window) {
-    _renderer = SDL_CreateRenderer(window.Get(), "opengl");
-    if (!_renderer) {
-        // Handle error
-    }
+GoreRenderer::GoreRenderer(GoreWindow& window) : _window(window) {
+    InitOpenGL();
 }
 
 GoreRenderer::~GoreRenderer() {
-    if (_renderer) {
-        SDL_DestroyRenderer(_renderer);
+    if (_glContext) {
+        SDL_GL_DestroyContext(_glContext);
     }
 }
 
 void GoreRenderer::Clear() {
-    SDL_RenderClear(_renderer);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
 void GoreRenderer::Present() {
-    SDL_RenderPresent(_renderer);
+    SDL_GL_SwapWindow(_window.Get());
 }
 
 void GoreRenderer::RenderTexture(GoreTexture* texture, const SDL_FRect* srcRect, const SDL_FRect* dstRect) {
     if (texture && texture->Get()) {
-        SDL_RenderTexture(_renderer, texture->Get(), srcRect, dstRect);
+        
     }
 }
 
-SDL_Renderer* GoreRenderer::GetRenderer() const {
-    return _renderer;
+SDL_GLContext GoreRenderer::GetRenderer() const {
+    return _glContext;
+}
+
+void GoreRenderer::InitOpenGL() {
+    // Create OpenGL context
+    _glContext = SDL_GL_CreateContext(_window.Get());
+
+    if (!_glContext) {
+        // Handle error
+    }
+
+    // Set up OpenGL state (e.g., viewport, clear color)
+    glViewport(0, 0, _window.GetWidth(), _window.GetHeight());
+    glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
 }

@@ -12,8 +12,11 @@ public:
     void Present();
     void RenderTexture(GoreTexture* texture, const SDL_FRect* srcRect = nullptr, const SDL_FRect* dstRect = nullptr);
 
-    SDL_Renderer* GetRenderer() const;
+    SDL_GLContext GetRenderer() const;
 
 private:
-    SDL_Renderer* _renderer;
+    void InitOpenGL();
+    GoreWindow& _window;
+
+    SDL_GLContext _glContext;
 };

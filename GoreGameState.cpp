@@ -1,4 +1,3 @@
-#include "pch.h"
 #include "GoreGameState.h"
 
 GoreGameState::GoreGameState() : _activeScreen(nullptr) {

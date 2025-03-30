@@ -1,5 +1,3 @@
-#include "pch.h"
-
 #include "GoreLogger.h"
 
 void GoreLogger::log(LOGLEVEL logLevel, const std::string& message) {

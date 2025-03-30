@@ -1,5 +1,4 @@
-#include "pch.h"
-#include "GoreResourceManager.h"
+﻿#include "GoreResourceManager.h"
 #include "GoreLogger.h"
 #include <filesystem>
 
@@ -53,18 +52,12 @@ void GoreResourceManager::LoadResource(RESOURCE_TYPES resourceType, const std::s
             
             return;
         }
+
         
-        SDL_Texture * texture = SDL_CreateTextureFromSurface(_renderer->GetRenderer(), surface);
-
-        if (!texture) {
-            GoreLogger::getInstance().log(ERR, "Failed to create texture from surface: " + filePath.string() + " Error: " + SDL_GetError());
-
-            return;
-        }
 
         SDL_DestroySurface(surface);
 
-        _textures[key] = new GoreTexture(texture);
+        _textures[key] = new GoreTexture(surface);
         break;
     }
 }

@@ -1,4 +1,3 @@
-#include "pch.h"
 #include "GoreMain.h"
 
 GoreMain::GoreMain(const std::string& title) : _title(title), _gWindow() {

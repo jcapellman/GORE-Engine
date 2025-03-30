@@ -1,4 +1,3 @@
-#include "pch.h"
 #include "GoreConfig.h"
 
 GoreConfig::GoreConfig(const std::string& fileName) {

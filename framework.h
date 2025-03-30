@@ -4,6 +4,8 @@
 
 #include <SDL3/SDL.h>
 #include <SDL3_image/SDL_image.h>
+#include <glad/gl.h> // OpenGL 1.2
+#include <KHR/khrplatform.h>
 
 #include <iostream>
 #include <fstream>
