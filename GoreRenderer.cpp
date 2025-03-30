@@ -30,13 +30,20 @@ SDL_GLContext GoreRenderer::GetRenderer() const {
 
 void GoreRenderer::InitOpenGL() {
     // Create OpenGL context
+    GoreLogger::getInstance().log(DEBUG, "Initializing OpenGL Renderer...");
+
     _glContext = SDL_GL_CreateContext(_window.Get());
 
     if (!_glContext) {
-        // Handle error
+        GoreLogger::getInstance().log(ERR, "Failed to initialize OpenGL Context");
+        GoreLogger::getInstance().log(ERR, SDL_GetError());
+
+        return;
     }
 
     // Set up OpenGL state (e.g., viewport, clear color)
     glViewport(0, 0, _window.GetWidth(), _window.GetHeight());
     glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
+
+    GoreLogger::getInstance().log(DEBUG, "OpenGL Renderer Initialized");
 }

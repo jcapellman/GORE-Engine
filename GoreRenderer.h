@@ -1,7 +1,8 @@
 #pragma once
+#include "framework.h"
 #include "GoreWindow.h"
 #include "GoreTexture.h"
-#include "framework.h"
+#include "GoreLogger.h"
 
 class GoreRenderer {
 public:

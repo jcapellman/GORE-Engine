@@ -1,5 +1,6 @@
 #pragma once
 #include "framework.h"
+#include "GoreLogger.h"
 
 class GoreWindow {
 public:
