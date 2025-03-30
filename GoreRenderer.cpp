@@ -32,6 +32,30 @@ void GoreRenderer::InitOpenGL() {
     // Create OpenGL context
     GoreLogger::getInstance().log(DEBUG, "Initializing OpenGL Renderer...");
 
+    if (SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 1) != 0) {
+        GoreLogger::getInstance().log(ERR, SDL_GetError());
+
+        return;
+    }
+
+    if (SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1) != 0) {
+        GoreLogger::getInstance().log(ERR, SDL_GetError());
+
+        return;
+    }
+
+    if (SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE) != 0) {
+        GoreLogger::getInstance().log(ERR, SDL_GetError());
+
+        return;
+    }
+
+    if (!_window.Get()) {
+        GoreLogger::getInstance().log(ERR, "Could not get the SDL Window");
+
+        return;
+    }
+
     _glContext = SDL_GL_CreateContext(_window.Get());
 
     if (!_glContext) {
@@ -40,6 +64,13 @@ void GoreRenderer::InitOpenGL() {
 
         return;
     }
+
+    const GLubyte* version = glGetString(GL_VERSION);
+    const GLubyte* vendor = glGetString(GL_VENDOR);
+    const GLubyte* renderer = glGetString(GL_RENDERER);
+
+    GoreLogger::getInstance().log(INFO, "OpenGL Renderer:");
+    GoreLogger::getInstance().log(INFO, std::string(reinterpret_cast<const char*>(version)));
 
     // Set up OpenGL state (e.g., viewport, clear color)
     glViewport(0, 0, _window.GetWidth(), _window.GetHeight());

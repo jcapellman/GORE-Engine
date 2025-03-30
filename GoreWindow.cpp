@@ -3,7 +3,12 @@
 void GoreWindow::Init(std::string windowTitle, unsigned int width, unsigned int height) {
 	GoreLogger::getInstance().log(DEBUG, "Initializing SDL...");
 
-	SDL_Init(SDL_INIT_VIDEO);
+	if (!SDL_Init(SDL_INIT_VIDEO)) {
+		GoreLogger::getInstance().log(ERR, "Failed to Init SDL");
+		GoreLogger::getInstance().log(ERR, SDL_GetError());
+
+		return;
+	}
 
 	GoreLogger::getInstance().log(DEBUG, "SDL Initialized");
 
