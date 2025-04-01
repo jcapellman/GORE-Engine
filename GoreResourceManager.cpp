@@ -2,8 +2,8 @@
 #include "GoreLogger.h"
 #include <filesystem>
 
-GoreResourceManager::GoreResourceManager(const std::string& baseFolderName, GoreRenderer* renderer)
-    : _baseFolderName(baseFolderName), _renderer(renderer) {
+GoreResourceManager::GoreResourceManager(const std::string& baseFolderName)
+    : _baseFolderName(baseFolderName) {
 }
 
 GoreResourceManager::~GoreResourceManager() {

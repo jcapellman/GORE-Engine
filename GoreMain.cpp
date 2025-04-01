@@ -17,56 +17,26 @@ void GoreMain::Init(const std::string& configFileName, const std::string& gameNa
 
     _gWindow.Init(_title, _gConfig.GetIntValue(GoreConfigKeys::R_SCREEN_WIDTH), _gConfig.GetIntValue(GoreConfigKeys::R_SCREEN_HEIGHT));
 
-    _gRenderer = std::make_unique<GoreRenderer>(_gWindow);
-
-    _gResourceManager = std::make_unique<GoreResourceManager>(gameName, _gRenderer.get());
+    _gResourceManager = std::make_unique<GoreResourceManager>(gameName);
 }
 
 void GoreMain::Run() {
-    while (_isRunning) {
-        HandleEvents();
-        Update();
-        Render();
-    }
-}
+    bool running = true;
+    SDL_Event event;
 
-void GoreMain::HandleEvents() {
-    SDL_Event e;
-
-    while (SDL_PollEvent(&e)) {
-        GoreEvent event = GoreEvent::NONE;
-        /*
-        switch (e.type) {
-        case SDL_EVENT_QUIT:
-            _isRunning = false;
-            break;
-        case SDL_EVENT_KEY_DOWN:
-            switch (e.key.key) {
-            case SDLK_UP:
-                event = GoreEvent::KEY_UP;
-                break;
-            case SDLK_DOWN:
-                event = GoreEvent::KEY_DOWN;
-                break;
-            case SDLK_ESCAPE:
-                event = GoreEvent::KEY_ESCAPE;
-                break;
-            case SDLK_RETURN:
-                event = GoreEvent::KEY_ENTER;
-                break;
-            default:
-                break;
+    while (running) {
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_QUIT) {
+                running = false;
             }
-            break;
-        default:
-            break;
-        }
-    */
-        if (event == GoreEvent::NONE) {
-            return;
         }
 
-        _gGameState.HandleEvents(event);
+        // Clear the screen with a color
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f); // Set clear color
+        glClear(GL_COLOR_BUFFER_BIT);         // Clear the screen
+
+        // Swap buffers (equivalent to double-buffering in Quake 3)
+        SDL_GL_SwapWindow(_gWindow.Get());
     }
 }
 

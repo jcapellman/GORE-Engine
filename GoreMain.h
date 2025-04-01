@@ -3,7 +3,6 @@
 #include "GoreWindow.h"
 #include "GoreConfig.h"
 #include "GoreResourceManager.h"
-#include "GoreRenderer.h"
 #include "GoreGameState.h"
 #include "GoreScreen.h"
 #include "GoreLogger.h"
@@ -33,6 +32,5 @@ private:
     GoreWindow _gWindow;
     GoreConfig _gConfig;
     std::unique_ptr<GoreResourceManager> _gResourceManager;
-    std::unique_ptr<GoreRenderer> _gRenderer;
 	GoreGameState _gGameState;
 };

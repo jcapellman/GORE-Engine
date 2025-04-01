@@ -1,7 +1,6 @@
 #pragma once
 #include "GoreEngine.h"
 #include "GoreTexture.h"
-#include "GoreRenderer.h"
 #include <map>
 #include <string>
 
@@ -11,7 +10,7 @@ enum RESOURCE_TYPES {
 
 class GoreResourceManager {
 public:
-    GoreResourceManager(const std::string& baseFolderName, GoreRenderer* renderer);
+    GoreResourceManager(const std::string& baseFolderName);
     ~GoreResourceManager();
 
     void LoadResource(RESOURCE_TYPES resourceType, const std::string& fileName, const std::string& key);
@@ -24,5 +23,4 @@ private:
 
     std::map<std::string, GoreTexture*> _textures;
     std::string _baseFolderName;
-    GoreRenderer* _renderer;
 };
