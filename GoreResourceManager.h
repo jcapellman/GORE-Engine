@@ -1,5 +1,5 @@
 #pragma once
-#include "framework.h"
+#include "GoreEngine.h"
 #include "GoreTexture.h"
 #include "GoreRenderer.h"
 #include <map>

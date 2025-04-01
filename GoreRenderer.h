@@ -1,5 +1,5 @@
 #pragma once
-#include "framework.h"
+#include "GoreEngine.h"
 #include "GoreWindow.h"
 #include "GoreTexture.h"
 #include "GoreLogger.h"

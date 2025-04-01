@@ -1,5 +1,5 @@
 #pragma once
-#include "framework.h"
+#include "GoreEngine.h"
 #include "GoreResourceManager.h"
 #include "GoreEvent.h"
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "framework.h"
+#include "GoreEngine.h"
 
 enum GoreEvent {
 	NONE,

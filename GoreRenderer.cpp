@@ -6,7 +6,7 @@ GoreRenderer::GoreRenderer(GoreWindow& window) : _window(window) {
 
 GoreRenderer::~GoreRenderer() {
     if (_glContext) {
-        SDL_GL_DestroyContext(_glContext);
+        SDL_GL_DeleteContext(_glContext);
     }
 }
 
@@ -32,23 +32,7 @@ void GoreRenderer::InitOpenGL() {
     // Create OpenGL context
     GoreLogger::getInstance().log(DEBUG, "Initializing OpenGL Renderer...");
 
-    if (SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 1) != 0) {
-        GoreLogger::getInstance().log(ERR, SDL_GetError());
-
-        return;
-    }
-
-    if (SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1) != 0) {
-        GoreLogger::getInstance().log(ERR, SDL_GetError());
-
-        return;
-    }
-
-    if (SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE) != 0) {
-        GoreLogger::getInstance().log(ERR, SDL_GetError());
-
-        return;
-    }
+    
 
     if (!_window.Get()) {
         GoreLogger::getInstance().log(ERR, "Could not get the SDL Window");

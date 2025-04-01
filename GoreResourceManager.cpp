@@ -55,7 +55,7 @@ void GoreResourceManager::LoadResource(RESOURCE_TYPES resourceType, const std::s
 
         
 
-        SDL_DestroySurface(surface);
+        SDL_FreeSurface(surface);
 
         _textures[key] = new GoreTexture(surface);
         break;

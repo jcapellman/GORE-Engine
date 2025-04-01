@@ -1,6 +1,6 @@
 #pragma once
 
-#include "framework.h"
+#include "GoreEngine.h"
 
 constexpr auto DEFAULT_R_SCREEN_WIDTH = "720";
 constexpr auto DEFAULT_R_SCREEN_HEIGHT = "480";

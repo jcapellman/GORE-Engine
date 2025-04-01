@@ -1,11 +1,10 @@
-#pragma once
+﻿#pragma once
 
 #define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
 
-#include <SDL3/SDL.h>
-#include <SDL3_image/SDL_image.h>
-#include <glad/gl.h> // OpenGL 1.2
-#include <KHR/khrplatform.h>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_image.h>
+#include <GL/gl.h> // OpenGL 1.2
 
 #include <iostream>
 #include <fstream>
@@ -18,6 +17,11 @@
 #include <iomanip>
 #include <chrono>
 #include <sstream>
+
+#pragma comment(lib, "SDL2.lib")
+#pragma comment(lib, "SDL2main.lib")
+#pragma comment(lib, "SDL2_image.lib")
+#pragma comment(lib, "opengl32.lib")
 
 const std::string DEFAULT_CONFIG_FILENAME = "config.cfg";
 const std::string DEFAULT_GAME_NAME = "base";

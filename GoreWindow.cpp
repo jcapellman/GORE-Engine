@@ -3,7 +3,7 @@
 void GoreWindow::Init(std::string windowTitle, unsigned int width, unsigned int height) {
 	GoreLogger::getInstance().log(DEBUG, "Initializing SDL...");
 
-	if (!SDL_Init(SDL_INIT_VIDEO)) {
+	if (!SDL_Init(SDL_INIT_EVERYTHING)) {
 		GoreLogger::getInstance().log(ERR, "Failed to Init SDL");
 		GoreLogger::getInstance().log(ERR, SDL_GetError());
 
@@ -14,7 +14,23 @@ void GoreWindow::Init(std::string windowTitle, unsigned int width, unsigned int 
 
 	GoreLogger::getInstance().log(DEBUG, "Initializing SDL Window with OpenGL...");
 
-	_window = SDL_CreateWindow(windowTitle.c_str(), width, height, SDL_WINDOW_OPENGL);
+	if (SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 1) != 0) {
+		GoreLogger::getInstance().log(ERR, "Error setting GL Context Major Version");
+		GoreLogger::getInstance().log(ERR, SDL_GetError());
+
+		return;
+	}
+
+	if (SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1) != 0) {
+		GoreLogger::getInstance().log(ERR, "Error setting GL Context Minor Version");
+		GoreLogger::getInstance().log(ERR, SDL_GetError());
+
+		return;
+	}
+
+	_window = SDL_CreateWindow(windowTitle.c_str(),
+		SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+		width, height, SDL_WINDOW_OPENGL);
 
 	if (!_window) {
 		GoreLogger::getInstance().log(ERR, "Failed to create Window");

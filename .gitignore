@@ -10,3 +10,11 @@ x64/*
 ARM64/*
 GoreLib/*
 build/*
+out/*
+CMakeFiles/*
+build/*
+CMakeCache.txt
+cmake*
+GoreEngine
+config.cfg
+Makefile

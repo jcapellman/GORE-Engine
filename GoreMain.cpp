@@ -35,7 +35,7 @@ void GoreMain::HandleEvents() {
 
     while (SDL_PollEvent(&e)) {
         GoreEvent event = GoreEvent::NONE;
-
+        /*
         switch (e.type) {
         case SDL_EVENT_QUIT:
             _isRunning = false;
@@ -61,7 +61,7 @@ void GoreMain::HandleEvents() {
         default:
             break;
         }
-    
+    */
         if (event == GoreEvent::NONE) {
             return;
         }
