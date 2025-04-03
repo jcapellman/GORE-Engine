@@ -13,12 +13,10 @@ project ("GoreEngine")
 # Find SDL2 package
 find_package(SDL2 REQUIRED)
 find_package(SDL2_image REQUIRED)
-find_package(OpenGL REQUIRED)
 
 file(GLOB SOURCES "*.cpp" "*.h")
 add_executable (GoreEngine ${SOURCES})
 
-target_link_libraries(GoreEngine PRIVATE OpenGL::GL)
 target_link_libraries(GoreEngine PRIVATE ${SDL2_LIBRARIES} ${SDL2_IMAGE_LIBRARIES})
 include_directories(${SDL2_INCLUDE_DIRS} ${SDL2_IMAGE_INCLUDE_DIRS})
 

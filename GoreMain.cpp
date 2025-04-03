@@ -17,7 +17,14 @@ void GoreMain::Init(const std::string& configFileName, const std::string& gameNa
 
     _gWindow.Init(_title, _gConfig.GetIntValue(GoreConfigKeys::R_SCREEN_WIDTH), _gConfig.GetIntValue(GoreConfigKeys::R_SCREEN_HEIGHT));
 
-    _gResourceManager = std::make_unique<GoreResourceManager>(gameName);
+    _renderer = SDL_CreateRenderer(_gWindow.Get(), -1, SDL_RENDERER_ACCELERATED);
+    if (!_renderer) {
+        GoreLogger::getInstance().log(ERR, "Failed to create SDL Renderer");
+        GoreLogger::getInstance().log(ERR, SDL_GetError());
+        return;
+    }
+
+    _gResourceManager = std::make_unique<GoreResourceManager>(_renderer, gameName);
 }
 
 void GoreMain::Run() {
@@ -32,15 +39,23 @@ void GoreMain::Run() {
         }
 
         // Clear the screen with a color
-        glClearColor(0.1f, 0.1f, 0.1f, 1.0f); // Set clear color
-        glClear(GL_COLOR_BUFFER_BIT);         // Clear the screen
+        SDL_SetRenderDrawColor(_renderer, 26, 26, 26, 255); // Set clear color (0.1f, 0.1f, 0.1f, 1.0f)
+        SDL_RenderClear(_renderer);                         // Clear the screen
 
-        // Swap buffers (equivalent to double-buffering in Quake 3)
-        SDL_GL_SwapWindow(_gWindow.Get());
+        // Render game state
+        Render();
+
+        // Present the back buffer
+        SDL_RenderPresent(_renderer);
     }
 }
 
+
 void GoreMain::Shutdown() {
+    if (_renderer) {
+        SDL_DestroyRenderer(_renderer);
+        _renderer = nullptr;
+    }
     _gWindow.Close();
 }
 

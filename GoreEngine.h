@@ -4,7 +4,6 @@
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
-#include <GL/gl.h> // OpenGL 1.2
 
 #include <iostream>
 #include <fstream>
@@ -21,7 +20,6 @@
 #pragma comment(lib, "SDL2.lib")
 #pragma comment(lib, "SDL2main.lib")
 #pragma comment(lib, "SDL2_image.lib")
-#pragma comment(lib, "opengl32.lib")
 
 const std::string DEFAULT_CONFIG_FILENAME = "config.cfg";
 const std::string DEFAULT_GAME_NAME = "base";

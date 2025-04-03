@@ -21,7 +21,6 @@ public:
 
     void AddScreen(const std::string& name, std::unique_ptr<GoreScreen> screen, bool isActiveScreen = false);
 private:
-    void HandleEvents();
     void Update();
     void Render();
 
@@ -33,4 +32,6 @@ private:
     GoreConfig _gConfig;
     std::unique_ptr<GoreResourceManager> _gResourceManager;
 	GoreGameState _gGameState;
+
+    SDL_Renderer* _renderer;
 };

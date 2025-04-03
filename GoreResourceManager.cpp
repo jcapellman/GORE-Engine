@@ -2,8 +2,8 @@
 #include "GoreLogger.h"
 #include <filesystem>
 
-GoreResourceManager::GoreResourceManager(const std::string& baseFolderName)
-    : _baseFolderName(baseFolderName) {
+GoreResourceManager::GoreResourceManager(SDL_Renderer * renderer, const std::string& baseFolderName)
+    : _baseFolderName(baseFolderName), _renderer(renderer) {
 }
 
 GoreResourceManager::~GoreResourceManager() {
@@ -15,10 +15,10 @@ GoreResourceManager::~GoreResourceManager() {
 
 std::string GoreResourceManager::GetResourceFolderFromEnum(RESOURCE_TYPES resourceType) {
     switch (resourceType) {
-        case TEXTURE:
-		    return "textures";
-        default:
-            throw std::invalid_argument("Unhandled resource type");
+    case TEXTURE:
+        return "textures";
+    default:
+        throw std::invalid_argument("Unhandled resource type");
     }
 }
 
@@ -39,25 +39,12 @@ std::filesystem::path GoreResourceManager::GetResourceFilePath(const std::string
     return requestedPath;
 }
 
-
 void GoreResourceManager::LoadResource(RESOURCE_TYPES resourceType, const std::string& fileName, const std::string& key) {
     std::filesystem::path filePath = GetResourceFilePath(fileName, resourceType, false);
 
     switch (resourceType) {
     case TEXTURE:
-        SDL_Surface* surface = IMG_Load(filePath.string().c_str());
-
-        if (!surface) {
-			GoreLogger::getInstance().log(ERR, "Failed to load texture: " + filePath.string() + " - error: " + SDL_GetError());
-            
-            return;
-        }
-
-        
-
-        SDL_FreeSurface(surface);
-
-        _textures[key] = new GoreTexture(surface);
+        _textures[key] = new GoreTexture(_renderer, filePath.string());
         break;
     }
 }
@@ -65,3 +52,4 @@ void GoreResourceManager::LoadResource(RESOURCE_TYPES resourceType, const std::s
 GoreTexture* GoreResourceManager::GetTexture(const std::string& key) {
     return _textures.at(key);
 }
+

@@ -14,10 +14,6 @@ public:
 
 	SDL_Window* Get() const;
 private:
-	void InitOpenGL();
-
-	SDL_GLContext _glContext;
-
 	SDL_Window* _window;
 
 	unsigned int _width;

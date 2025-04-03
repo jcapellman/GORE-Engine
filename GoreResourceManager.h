@@ -10,17 +10,17 @@ enum RESOURCE_TYPES {
 
 class GoreResourceManager {
 public:
-    GoreResourceManager(const std::string& baseFolderName);
+    GoreResourceManager(SDL_Renderer * renderer, const std::string& baseFolderName);
     ~GoreResourceManager();
-
     void LoadResource(RESOURCE_TYPES resourceType, const std::string& fileName, const std::string& key);
     GoreTexture* GetTexture(const std::string& key);
 
 private:
-    std::filesystem::path GetResourceFilePath(const std::string& fileName, RESOURCE_TYPES resourcetType, bool usingBaseFolder);
-
     std::string GetResourceFolderFromEnum(RESOURCE_TYPES resourceType);
+    std::filesystem::path GetResourceFilePath(const std::string& fileName, RESOURCE_TYPES resourceType, bool usingBaseFolder);
 
     std::map<std::string, GoreTexture*> _textures;
     std::string _baseFolderName;
+    SDL_Renderer* _renderer;
 };
+

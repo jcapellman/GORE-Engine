@@ -3,11 +3,10 @@
 
 class GoreTexture {
 public:
-    GoreTexture(SDL_Surface * texture);
+    GoreTexture(SDL_Renderer* renderer, const std::string& filePath);
     ~GoreTexture();
-
-    GLuint Get() const;
+    SDL_Texture* Get() const;
 
 private:
-    GLuint _texture;
+    SDL_Texture* _texture;
 };
