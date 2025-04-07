@@ -3,7 +3,7 @@
 void GoreWindow::Init(std::string windowTitle, unsigned int width, unsigned int height) {
 	GoreLogger::getInstance().log(DEBUG, "Initializing SDL...");
 
-	if (!SDL_Init(SDL_INIT_EVERYTHING)) {
+	if (!SDL_Init(SDL_INIT_VIDEO)) {
 		GoreLogger::getInstance().log(ERR, "Failed to Init SDL");
 		GoreLogger::getInstance().log(ERR, SDL_GetError());
 
@@ -13,8 +13,7 @@ void GoreWindow::Init(std::string windowTitle, unsigned int width, unsigned int 
 	GoreLogger::getInstance().log(DEBUG, "SDL Initialized");
 
 	_window = SDL_CreateWindow(windowTitle.c_str(),
-		SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-		width, height, SDL_WINDOW_SHOWN);
+		width, height, 0);
 
 	if (!_window) {
 		GoreLogger::getInstance().log(ERR, "Failed to create Window");

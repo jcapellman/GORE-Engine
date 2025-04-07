@@ -10,6 +10,7 @@ x64/*
 ARM64/*
 GoreLib/*
 build/*
+build_windows/*
 out/*
 CMakeFiles/*
 build/*

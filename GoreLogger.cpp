@@ -16,7 +16,12 @@ void GoreLogger::log(LOGLEVEL logLevel, const std::string& message) {
 	auto now = std::chrono::system_clock::now();
 	auto now_c = std::chrono::system_clock::to_time_t(now);
 	std::tm timeInfo;
+
+#ifdef WIN32
+	localtime_s(&timeInfo, &now_c);
+#else
 	localtime_r(&now_c, &timeInfo);
+#endif
 
 	std::stringstream timeStream;
 	timeStream << std::put_time(&timeInfo, "%Y-%m-%d %H:%M:%S");

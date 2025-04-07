@@ -17,7 +17,8 @@ void GoreMain::Init(const std::string& configFileName, const std::string& gameNa
 
     _gWindow.Init(_title, _gConfig.GetIntValue(GoreConfigKeys::R_SCREEN_WIDTH), _gConfig.GetIntValue(GoreConfigKeys::R_SCREEN_HEIGHT));
 
-    _renderer = SDL_CreateRenderer(_gWindow.Get(), -1, SDL_RENDERER_ACCELERATED);
+    _renderer = SDL_CreateRenderer(_gWindow.Get(), gameName.c_str());
+
     if (!_renderer) {
         GoreLogger::getInstance().log(ERR, "Failed to create SDL Renderer");
         GoreLogger::getInstance().log(ERR, SDL_GetError());
@@ -33,7 +34,7 @@ void GoreMain::Run() {
 
     while (running) {
         while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) {
+            if (event.type == SDL_EVENT_QUIT) {
                 running = false;
             }
         }

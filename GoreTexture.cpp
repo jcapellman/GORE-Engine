@@ -10,12 +10,12 @@ GoreTexture::GoreTexture(SDL_Renderer* renderer, const std::string& filePath) {
     // Create SDL_Texture from SDL_Surface
     _texture = SDL_CreateTextureFromSurface(renderer, surface);
     if (!_texture) {
-        SDL_FreeSurface(surface);
+        SDL_DestroySurface(surface);
         throw std::runtime_error("Failed to create texture from surface: " + filePath);
     }
 
     // Free the surface as it is no longer needed
-    SDL_FreeSurface(surface);
+    SDL_DestroySurface(surface);
 }
 
 GoreTexture::~GoreTexture() {
