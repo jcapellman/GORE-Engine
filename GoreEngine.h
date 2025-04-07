@@ -2,6 +2,10 @@
 
 #define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
 
+#ifdef WIN32
+#include <Windows.h>
+#endif
+
 #include <SDL3/SDL.h>
 
 #include <iostream>

@@ -9,7 +9,7 @@ set(CMAKE_PREFIX_PATH "C:/SDL3/VisualC/")
 find_package(SDL3 REQUIRED)
 
 file(GLOB SOURCES "*.cpp" "*.h")
-add_executable(GoreEngine ${SOURCES})
+add_executable(GoreEngine WIN32 ${SOURCES})
 
 # Link SDL3 and SDL3_image libraries
 target_link_libraries(GoreEngine PRIVATE SDL3::SDL3)
