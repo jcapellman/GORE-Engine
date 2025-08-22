@@ -1,6 +1,6 @@
 #include "GoreWindow.h"
 
-void GoreWindow::Init(std::string windowTitle, unsigned int width, unsigned int height) {
+void GoreWindow::Init(std::string_view windowTitle, unsigned int width, unsigned int height) {
 	GoreLogger::getInstance().log(DEBUG, "Initializing SDL...");
 
 	if (!SDL_Init(SDL_INIT_VIDEO)) {
@@ -12,7 +12,7 @@ void GoreWindow::Init(std::string windowTitle, unsigned int width, unsigned int 
 
 	GoreLogger::getInstance().log(DEBUG, "SDL Initialized");
 
-	_window = SDL_CreateWindow(windowTitle.c_str(),
+	_window = SDL_CreateWindow(windowTitle.data(),
 		width, height, 0);
 
 	if (!_window) {
@@ -30,14 +30,14 @@ void GoreWindow::Close() {
 	SDL_DestroyWindow(_window);
 }
 
-SDL_Window* GoreWindow::Get() const {
+constexpr SDL_Window* GoreWindow::Get() const {
 	return _window;
 }
 
-unsigned int GoreWindow::GetWidth() const {
+constexpr unsigned int GoreWindow::GetWidth() const {
 	return _width;
 }
 
-unsigned int GoreWindow::GetHeight() const {
+constexpr unsigned int GoreWindow::GetHeight() const {
 	return _height;
 }
