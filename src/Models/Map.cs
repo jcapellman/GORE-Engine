@@ -6,7 +6,12 @@ namespace GORE.Models
     {
         public int Width { get; private set; }
         public int Height { get; private set; }
-        private Tile[,] tiles;
+        private readonly Tile[,] tiles;
+
+        public Map(Tile[,] tiles)
+        {
+            this.tiles = tiles;
+        }
 
         public Map(int width, int height)
         {
@@ -17,7 +22,7 @@ namespace GORE.Models
 
         public void GenerateMap()
         {
-            Random random = new Random();
+            Random random = new();
 
             for (int y = 0; y < Height; y++)
             {

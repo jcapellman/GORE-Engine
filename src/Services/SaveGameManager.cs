@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using Windows.Storage;
 using GORE.Models;
 
-namespace GORE
+namespace GORE.Services
 {
     [DataContract]
     public class SaveData
@@ -71,7 +71,7 @@ namespace GORE
 
         public Character ToCharacter()
         {
-            return new Character
+            return new Character(HeroName)
             {
                 Name = HeroName,
                 Level = Level,
@@ -102,11 +102,9 @@ namespace GORE
                 var folder = ApplicationData.Current.LocalFolder;
                 var file = await folder.CreateFileAsync(SaveFileName, CreationCollisionOption.ReplaceExisting);
 
-                using (var stream = await file.OpenStreamForWriteAsync())
-                {
-                    var serializer = new DataContractSerializer(typeof(SaveData));
-                    serializer.WriteObject(stream, saveData);
-                }
+                using var stream = await file.OpenStreamForWriteAsync();
+                var serializer = new DataContractSerializer(typeof(SaveData));
+                serializer.WriteObject(stream, saveData);
 
                 return true;
             }
@@ -123,11 +121,9 @@ namespace GORE
                 var folder = ApplicationData.Current.LocalFolder;
                 var file = await folder.GetFileAsync(SaveFileName);
 
-                using (var stream = await file.OpenStreamForReadAsync())
-                {
-                    var serializer = new DataContractSerializer(typeof(SaveData));
-                    return (SaveData)serializer.ReadObject(stream);
-                }
+                using var stream = await file.OpenStreamForReadAsync();
+                var serializer = new DataContractSerializer(typeof(SaveData));
+                return (SaveData)serializer.ReadObject(stream);
             }
             catch
             {

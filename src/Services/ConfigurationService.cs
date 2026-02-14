@@ -3,9 +3,9 @@ using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Windows.Storage;
-using GORE.Core.Models;
-
-namespace GORE.Core.Services
+using GORE.Models;
+#nullable enable
+namespace GORE.Services
 {
     /// <summary>
     /// Service for loading and managing game configuration from game.json
@@ -38,10 +38,7 @@ namespace GORE.Core.Services
                 
                 _config = JsonSerializer.Deserialize<GameConfiguration>(json, options);
                 
-                if (_config == null)
-                {
-                    _config = GetDefaultConfiguration();
-                }
+                _config ??= GetDefaultConfiguration();
                 
                 return _config;
             }

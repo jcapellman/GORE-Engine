@@ -7,7 +7,12 @@ namespace GORE.GameEngine
     {
         public Enemy CurrentEnemy { get; private set; }
         private Character player;
-        private Random random;
+        private readonly Random random;
+
+        public BattleSystem(Random random)
+        {
+            this.random = random;
+        }
 
         public BattleSystem()
         {

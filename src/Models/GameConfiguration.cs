@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace GORE.Core.Models
+namespace GORE.Models
 {
     /// <summary>
     /// Main configuration model for GORE Engine games.

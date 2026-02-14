@@ -1,0 +1,14 @@
+<gore:BaseMainMenuPage
+	x:Class="GORE.Pages.MainMenuPage"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:gore="using:GORE.Pages">
+	
+	<Grid Background="Blue">
+		<TextBlock Text="MINIMAL TEST" 
+				   Foreground="White" 
+				   FontSize="48"
+				   HorizontalAlignment="Center"
+				   VerticalAlignment="Center"/>
+	</Grid>
+</gore:BaseMainMenuPage>

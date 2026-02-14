@@ -18,6 +18,11 @@ namespace GORE.Models
 
         public bool IsAlive => CurrentHP > 0;
 
+        public Character(string name)
+        {
+            Name = name;
+        }
+
         public void LevelUp()
         {
             Level++;

@@ -19,15 +19,19 @@ namespace GORE.Services
         private static MediaPlayer mediaPlayer;
         private static MusicTrack? currentTrack;
 
-        static MusicManager()
+        private static void EnsureInitialized()
         {
-            mediaPlayer = new MediaPlayer();
-            mediaPlayer.IsLoopingEnabled = true;
-            mediaPlayer.Volume = 0.5; // 50% volume
+            mediaPlayer ??= new MediaPlayer
+                {
+                    IsLoopingEnabled = true,
+                    Volume = 0.5 // 50% volume
+                };
         }
 
         public static async void PlayMusic(MusicTrack track)
         {
+            EnsureInitialized(); // Initialize on first use
+            
             // Don't restart if already playing this track
             if (currentTrack == track && mediaPlayer.PlaybackSession.PlaybackState == MediaPlaybackState.Playing)
             {
@@ -82,12 +86,16 @@ namespace GORE.Services
 
         public static void StopMusic()
         {
-            mediaPlayer.Pause();
-            currentTrack = null;
+            if (mediaPlayer != null)
+            {
+                mediaPlayer.Pause();
+                currentTrack = null;
+            }
         }
 
         public static void SetVolume(double volume)
         {
+            EnsureInitialized();
             mediaPlayer.Volume = Math.Clamp(volume, 0.0, 1.0);
         }
 

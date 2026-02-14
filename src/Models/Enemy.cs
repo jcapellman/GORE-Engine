@@ -16,7 +16,7 @@ namespace GORE.Models
 
         public static Enemy CreateRandomEnemy(int playerLevel)
         {
-            Random random = new Random();
+            Random random = new();
             string[] enemyTypes = { "Goblin", "Slime", "Bat", "Wolf", "Skeleton" };
             string enemyName = enemyTypes[random.Next(enemyTypes.Length)];
 
