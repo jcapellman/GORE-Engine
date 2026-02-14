@@ -5,6 +5,12 @@
     "developer": "GORE Test",
     "description": "A test application for the GORE Engine"
   },
+  "ui": {
+    "mainMenuBackground": "Assets/UI/MainMenu.png",
+    "cursor": "Assets/UI/Cursor.png",
+    "font": "Segoe UI",
+    "fontSize": 32
+  },
   "music": {
     "title": "music/title.mp3",
     "exploration": "music/exploration.mp3",

@@ -58,6 +58,10 @@ namespace GORE.Models
 
     public class UISettings
     {
+        public string MainMenuBackground { get; set; } = "Assets/MainMenu.png";
+        public string Cursor { get; set; } = "Assets/Cursor.png";
+        public string Font { get; set; } = "Segoe UI";
+        public int FontSize { get; set; } = 32;
         public string Theme { get; set; } = "FF6Blue";
         public string BorderColor { get; set; } = "#FFFFFF";
         public string BackgroundColor { get; set; } = "#0000AA";

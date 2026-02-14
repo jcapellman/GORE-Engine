@@ -1,5 +1,4 @@
 using Microsoft.UI.Xaml;
-using Microsoft.UI.Windowing;
 using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.Graphics.Canvas.Effects;
@@ -7,7 +6,6 @@ using System;
 using System.Threading.Tasks;
 using Windows.Foundation;
 using System.Numerics;
-using WinRT.Interop;
 
 namespace GORE.UI
 {
@@ -31,36 +29,9 @@ namespace GORE.UI
             ExtendsContentIntoTitleBar = true;
 
             // Enter fullscreen mode
-            EnterFullScreenMode();
+            ScreenHelper.EnterFullScreenMode(this);
 
             CanvasControl.CreateResources += CanvasControl_CreateResources;
-        }
-
-        private void EnterFullScreenMode()
-        {
-            var hwnd = WindowNative.GetWindowHandle(this);
-            var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
-            var appWindow = AppWindow.GetFromWindowId(windowId);
-
-            if (appWindow.Presenter is OverlappedPresenter presenter)
-            {
-                presenter.SetBorderAndTitleBar(false, false);
-                presenter.IsMaximizable = false;
-                presenter.IsMinimizable = false;
-                presenter.IsResizable = false;
-            }
-
-            // Get the primary display area
-            var displayArea = DisplayArea.Primary;
-
-            // Position at top-left corner and fill entire screen
-            if (appWindow != null)
-            {
-                appWindow.Move(new Windows.Graphics.PointInt32(0, 0));
-                appWindow.Resize(new Windows.Graphics.SizeInt32(
-                    displayArea.OuterBounds.Width,
-                    displayArea.OuterBounds.Height));
-            }
         }
 
         private async void CanvasControl_CreateResources(CanvasControl sender, Microsoft.Graphics.Canvas.UI.CanvasCreateResourcesEventArgs args)
@@ -160,8 +131,9 @@ namespace GORE.UI
 
             await Task.Delay(FadeOutDuration);
 
-            _mainWindow.Activate();
-            Close();
+            // Transition to main menu
+            var mainMenuScreen = new MainMenuScreen(_mainWindow);
+            ScreenHelper.TransitionTo(this, mainMenuScreen);
         }
     }
 }
