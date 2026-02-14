@@ -1,0 +1,24 @@
+{
+  "game": {
+    "title": "GORE Engine Test",
+    "version": "1.0.0",
+    "developer": "GORE Test",
+    "description": "A test application for the GORE Engine"
+  },
+  "music": {
+    "title": "music/title.mp3",
+    "exploration": "music/exploration.mp3",
+    "battle": "music/battle.mp3",
+    "victory": "music/victory.mp3",
+    "gameOver": "music/gameover.mp3"
+  },
+  "graphics": {
+    "tileSize": 32,
+    "screenWidth": 800,
+    "screenHeight": 600
+  },
+  "gameplay": {
+    "encounterRate": 10,
+    "startingLevel": 1
+  }
+}
