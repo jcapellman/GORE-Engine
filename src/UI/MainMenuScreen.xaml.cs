@@ -43,9 +43,6 @@ namespace GORE.UI
         {
             var config = Engine.GOREEngine.GetConfiguration();
 
-            // Set game title
-            GameTitleText.Text = config.Game.Title;
-
             // Load background image
             if (!string.IsNullOrEmpty(config.UI.MainMenuBackground))
             {
@@ -185,19 +182,11 @@ namespace GORE.UI
 
             var targetItem = _menuItems[index];
 
-            // Highlight selected item
-            for (int i = 0; i < _menuItems.Length; i++)
-            {
-                _menuItems[i].Foreground = new SolidColorBrush(
-                    i == index ? Windows.UI.Color.FromArgb(255, 255, 255, 100) : Windows.UI.Color.FromArgb(255, 255, 255, 255)
-                );
-            }
-
             // Animate cursor to new position
             var storyboard = new Storyboard();
             var animation = new DoubleAnimation
             {
-                To = index * (targetItem.ActualHeight + 40), // Height + padding
+                To = index * (targetItem.ActualHeight + 20), // Height + margin
                 Duration = new Duration(TimeSpan.FromMilliseconds(150)),
                 EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
             };

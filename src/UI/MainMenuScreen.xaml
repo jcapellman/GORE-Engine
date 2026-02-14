@@ -16,101 +16,82 @@
 
         <!-- Menu Container -->
         <Grid
-            HorizontalAlignment="Center"
+            HorizontalAlignment="Left"
             VerticalAlignment="Center"
-            Width="600">
+            Margin="200,0,0,0">
 
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <!-- Game Title -->
-            <TextBlock 
-                x:Name="GameTitleText"
+            <!-- Cursor Image -->
+            <Image 
+                x:Name="CursorImage"
                 Grid.Row="0"
-                Text="GORE ENGINE"
-                FontSize="72"
-                FontWeight="Bold"
+                Width="32"
+                Height="32"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Center"
+                Margin="0,0,20,0">
+                <Image.RenderTransform>
+                    <TranslateTransform x:Name="CursorTransform"/>
+                </Image.RenderTransform>
+            </Image>
+
+            <!-- New Game -->
+            <TextBlock 
+                x:Name="NewGameText"
+                Grid.Row="0"
+                Text="New Game"
+                FontSize="40"
                 Foreground="White"
-                HorizontalAlignment="Center"
-                Margin="0,0,0,100"/>
+                HorizontalAlignment="Left"
+                Margin="60,10,0,10"
+                PointerEntered="MenuItem_PointerEntered"
+                PointerPressed="NewGame_Click"
+                Tag="0"/>
 
-            <!-- Menu Items with Custom Cursor -->
-            <Grid Grid.Row="1">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
+            <!-- Load Game -->
+            <TextBlock 
+                x:Name="LoadGameText"
+                Grid.Row="1"
+                Text="Load Game"
+                FontSize="40"
+                Foreground="White"
+                HorizontalAlignment="Left"
+                Margin="60,10,0,10"
+                PointerEntered="MenuItem_PointerEntered"
+                PointerPressed="LoadGame_Click"
+                Tag="1"/>
 
-                <!-- Cursor Image -->
-                <Image 
-                    x:Name="CursorImage"
-                    Grid.Row="0"
-                    Width="32"
-                    Height="32"
-                    HorizontalAlignment="Left"
-                    VerticalAlignment="Center"
-                    Margin="-50,0,0,0">
-                    <Image.RenderTransform>
-                        <TranslateTransform x:Name="CursorTransform"/>
-                    </Image.RenderTransform>
-                </Image>
+            <!-- Settings -->
+            <TextBlock 
+                x:Name="SettingsText"
+                Grid.Row="2"
+                Text="Settings"
+                FontSize="40"
+                Foreground="White"
+                HorizontalAlignment="Left"
+                Margin="60,10,0,10"
+                PointerEntered="MenuItem_PointerEntered"
+                PointerPressed="Settings_Click"
+                Tag="2"/>
 
-                <!-- New Game -->
-                <TextBlock 
-                    x:Name="NewGameText"
-                    Grid.Row="0"
-                    Text="New Game"
-                    FontSize="40"
-                    Foreground="White"
-                    HorizontalAlignment="Center"
-                    Padding="20"
-                    PointerEntered="MenuItem_PointerEntered"
-                    PointerPressed="NewGame_Click"
-                    Tag="0"/>
-
-                <!-- Load Game -->
-                <TextBlock 
-                    x:Name="LoadGameText"
-                    Grid.Row="1"
-                    Text="Load Game"
-                    FontSize="40"
-                    Foreground="White"
-                    HorizontalAlignment="Center"
-                    Padding="20"
-                    PointerEntered="MenuItem_PointerEntered"
-                    PointerPressed="LoadGame_Click"
-                    Tag="1"/>
-
-                <!-- Settings -->
-                <TextBlock 
-                    x:Name="SettingsText"
-                    Grid.Row="2"
-                    Text="Settings"
-                    FontSize="40"
-                    Foreground="White"
-                    HorizontalAlignment="Center"
-                    Padding="20"
-                    PointerEntered="MenuItem_PointerEntered"
-                    PointerPressed="Settings_Click"
-                    Tag="2"/>
-
-                <!-- Exit -->
-                <TextBlock 
-                    x:Name="ExitText"
-                    Grid.Row="3"
-                    Text="Exit"
-                    FontSize="40"
-                    Foreground="White"
-                    HorizontalAlignment="Center"
-                    Padding="20"
-                    PointerEntered="MenuItem_PointerEntered"
-                    PointerPressed="Exit_Click"
-                    Tag="3"/>
-            </Grid>
+            <!-- Exit -->
+            <TextBlock 
+                x:Name="ExitText"
+                Grid.Row="3"
+                Text="Exit"
+                FontSize="40"
+                Foreground="White"
+                HorizontalAlignment="Left"
+                Margin="60,10,0,10"
+                PointerEntered="MenuItem_PointerEntered"
+                PointerPressed="Exit_Click"
+                Tag="3"/>
         </Grid>
     </Grid>
 </Window>
