@@ -1,44 +1,23 @@
 [
   {
     "id": 0,
-    "name": "Ocean",
-    "color": "#1E4D8B",
+    "name": "Water",
+    "texture": "Assets/Tiles/Water.png",
     "isWalkable": false,
     "encounterRate": 0
   },
   {
     "id": 1,
     "name": "Grass",
-    "color": "#5EAA3C",
+    "texture": "Assets/Tiles/Grass.png",
     "isWalkable": true,
     "encounterRate": 10
   },
   {
     "id": 2,
-    "name": "Forest",
-    "color": "#2D5A1E",
+    "name": "Sand",
+    "texture": "Assets/Tiles/Sand.png",
     "isWalkable": true,
-    "encounterRate": 15
-  },
-  {
-    "id": 3,
-    "name": "Mountain",
-    "color": "#8B7355",
-    "isWalkable": false,
-    "encounterRate": 0
-  },
-  {
-    "id": 4,
-    "name": "Desert",
-    "color": "#D4A574",
-    "isWalkable": true,
-    "encounterRate": 12
-  },
-  {
-    "id": 5,
-    "name": "Snow",
-    "color": "#E8F0F8",
-    "isWalkable": true,
-    "encounterRate": 8
+    "encounterRate": 5
   }
 ]

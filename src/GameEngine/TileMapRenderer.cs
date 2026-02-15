@@ -12,26 +12,24 @@ namespace GORE.GameEngine
     {
         private readonly int screenWidth;
         private readonly int screenHeight;
-        private readonly int tileSize = 16; // 16x16 pixel tiles like FF1
+        private readonly int tileSize = 16;
         private readonly int mapWidth;
         private readonly int mapHeight;
 
         public Vector2 PlayerPosition { get; set; }
-        public int PlayerDirection { get; set; } // 0=Down, 1=Left, 2=Right, 3=Up
+        public int PlayerDirection { get; set; }
 
         public List<WorldMapLocation> Locations { get; set; }
-        
+
         private readonly Color[] terrainColors = new Color[]
         {
-            Color.FromArgb(255, 30, 77, 139),   // 0: Ocean
-            Color.FromArgb(255, 94, 170, 60),   // 1: Grass
-            Color.FromArgb(255, 45, 90, 30),    // 2: Forest
-            Color.FromArgb(255, 139, 115, 85),  // 3: Mountain
-            Color.FromArgb(255, 212, 165, 116), // 4: Desert
-            Color.FromArgb(255, 232, 240, 248), // 5: Snow
+            Color.FromArgb(255, 30, 77, 139),   // 0: Water (fallback)
+            Color.FromArgb(255, 94, 170, 60),   // 1: Grass (fallback)
+            Color.FromArgb(255, 212, 165, 116), // 2: Sand (fallback)
         };
 
         private int[,] mapData;
+        private Dictionary<int, CanvasBitmap> tileTextures = new Dictionary<int, CanvasBitmap>();
 
         public TileMapRenderer(int screenWidth, int screenHeight, int mapWidth, int mapHeight)
         {
@@ -75,6 +73,75 @@ namespace GORE.GameEngine
             System.Diagnostics.Debug.WriteLine($"✓ Loaded {width}x{height} tile map from JSON");
         }
 
+        public async System.Threading.Tasks.Task LoadTileTexturesAsync(CanvasControl canvas, List<WorldMapTerrain> terrainTypes)
+        {
+            if (terrainTypes == null || terrainTypes.Count == 0)
+            {
+                System.Diagnostics.Debug.WriteLine("✗ No terrain types provided, will use solid colors");
+                return;
+            }
+
+            System.Diagnostics.Debug.WriteLine($"=== LOADING TILE TEXTURES ===");
+            System.Diagnostics.Debug.WriteLine($"Base Directory: {AppContext.BaseDirectory}");
+
+            foreach (var terrain in terrainTypes)
+            {
+                System.Diagnostics.Debug.WriteLine($"Processing terrain: {terrain.Name} (ID: {terrain.Id})");
+                System.Diagnostics.Debug.WriteLine($"  Texture path from JSON: {terrain.Texture}");
+
+                if (!string.IsNullOrEmpty(terrain.Texture))
+                {
+                    try
+                    {
+                        var baseDirectory = AppContext.BaseDirectory;
+                        var texturePath = System.IO.Path.Combine(baseDirectory, terrain.Texture);
+
+                        System.Diagnostics.Debug.WriteLine($"  Full path: {texturePath}");
+                        System.Diagnostics.Debug.WriteLine($"  File exists: {System.IO.File.Exists(texturePath)}");
+
+                        if (System.IO.File.Exists(texturePath))
+                        {
+                            var bitmap = await CanvasBitmap.LoadAsync(canvas, texturePath);
+                            tileTextures[terrain.Id] = bitmap;
+                            System.Diagnostics.Debug.WriteLine($"  ✓ SUCCESS: Loaded texture {bitmap.SizeInPixels.Width}x{bitmap.SizeInPixels.Height}");
+                        }
+                        else
+                        {
+                            System.Diagnostics.Debug.WriteLine($"  ✗ FAILED: File not found");
+
+                            // List what files ARE in the Tiles directory
+                            var tilesDir = System.IO.Path.Combine(baseDirectory, "Assets", "Tiles");
+                            if (System.IO.Directory.Exists(tilesDir))
+                            {
+                                System.Diagnostics.Debug.WriteLine($"  Files in {tilesDir}:");
+                                foreach (var file in System.IO.Directory.GetFiles(tilesDir))
+                                {
+                                    System.Diagnostics.Debug.WriteLine($"    - {System.IO.Path.GetFileName(file)}");
+                                }
+                            }
+                            else
+                            {
+                                System.Diagnostics.Debug.WriteLine($"  Directory doesn't exist: {tilesDir}");
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"  ✗ EXCEPTION: {ex.Message}");
+                        System.Diagnostics.Debug.WriteLine($"  Stack: {ex.StackTrace}");
+                    }
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"  No texture specified for {terrain.Name}");
+                }
+            }
+
+            System.Diagnostics.Debug.WriteLine($"=== TEXTURE LOADING COMPLETE ===");
+            System.Diagnostics.Debug.WriteLine($"Loaded {tileTextures.Count}/{terrainTypes.Count} textures");
+            System.Diagnostics.Debug.WriteLine($"Using textures: {tileTextures.Count > 0}");
+        }
+
         public void Render(CanvasDrawingSession drawSession)
         {
             if (mapData == null)
@@ -107,16 +174,27 @@ namespace GORE.GameEngine
                         if (mapX >= 0 && mapX < mapWidth && mapY >= 0 && mapY < mapHeight)
                         {
                             int terrainType = mapData[mapX, mapY];
-                            Color tileColor = terrainColors[Math.Min(terrainType, terrainColors.Length - 1)];
 
                             float screenX = x * tileSize;
                             float screenY = y * tileSize;
 
-                            drawSession.FillRectangle(screenX, screenY, tileSize, tileSize, tileColor);
+                            // Draw texture if available, otherwise use color
+                            if (tileTextures.ContainsKey(terrainType))
+                            {
+                                var texture = tileTextures[terrainType];
+                                drawSession.DrawImage(texture, 
+                                    new Windows.Foundation.Rect(screenX, screenY, tileSize, tileSize),
+                                    new Windows.Foundation.Rect(0, 0, texture.SizeInPixels.Width, texture.SizeInPixels.Height));
+                            }
+                            else
+                            {
+                                // Fallback to solid color
+                                Color tileColor = terrainColors[Math.Min(terrainType, terrainColors.Length - 1)];
+                                drawSession.FillRectangle(screenX, screenY, tileSize, tileSize, tileColor);
+                            }
 
-                            // Draw tile border for grid effect
-                            drawSession.DrawRectangle(screenX, screenY, tileSize, tileSize, 
-                                Color.FromArgb(40, 0, 0, 0));
+                            // Draw subtle tile border for grid effect (optional)
+                            // drawSession.DrawRectangle(screenX, screenY, tileSize, tileSize, Color.FromArgb(20, 0, 0, 0));
                         }
                     }
                 }

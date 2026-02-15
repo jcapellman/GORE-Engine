@@ -20,6 +20,7 @@ namespace GORE.UI
         private readonly Window _mainWindow;
         private TileMapRenderer tileMapRenderer;
         private WorldMap worldMap;
+        private List<WorldMapTerrain> terrainTypes;
         private Character player;
         private DispatcherQueueTimer gameLoopTimer;
 
@@ -41,6 +42,7 @@ namespace GORE.UI
             ScreenHelper.EnterFullScreenMode(this);
 
             _ = LoadWorldMapAsync();
+            _ = LoadTerrainTypesAsync();
 
             SetupGameLoop();
         }
@@ -116,6 +118,47 @@ namespace GORE.UI
                 System.Diagnostics.Debug.WriteLine($"✗ Error loading world map: {ex.Message}");
                 System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
                 CreateDefaultWorldMap();
+            }
+        }
+
+        private async Task LoadTerrainTypesAsync()
+        {
+            try
+            {
+                var baseDirectory = AppContext.BaseDirectory;
+                var terrainPath = Path.Combine(baseDirectory, "Assets", "Maps", "TerrainTypes.json");
+
+                System.Diagnostics.Debug.WriteLine($"=== LOADING TERRAIN TYPES ===");
+                System.Diagnostics.Debug.WriteLine($"Terrain Path: {terrainPath}");
+                System.Diagnostics.Debug.WriteLine($"File Exists: {File.Exists(terrainPath)}");
+
+                if (File.Exists(terrainPath))
+                {
+                    var json = await File.ReadAllTextAsync(terrainPath);
+                    var options = new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    };
+                    terrainTypes = JsonSerializer.Deserialize<List<WorldMapTerrain>>(json, options);
+
+                    System.Diagnostics.Debug.WriteLine($"✓ Loaded {terrainTypes?.Count ?? 0} terrain types");
+
+                    if (terrainTypes != null)
+                    {
+                        foreach (var terrain in terrainTypes)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"    - {terrain.Name} (ID: {terrain.Id}, Texture: {terrain.Texture})");
+                        }
+                    }
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"✗ TerrainTypes.json not found at: {terrainPath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"✗ Error loading terrain types: {ex.Message}");
             }
         }
 
@@ -237,6 +280,16 @@ namespace GORE.UI
 
         private async Task CreateResourcesAsync(CanvasControl sender)
         {
+            // Wait for WorldMap and TerrainTypes to be loaded
+            int attempts = 0;
+            while ((worldMap == null || terrainTypes == null) && attempts < 20)
+            {
+                await Task.Delay(100);
+                attempts++;
+            }
+
+            System.Diagnostics.Debug.WriteLine($"CreateResourcesAsync: WorldMap={worldMap != null}, TerrainTypes={terrainTypes != null}");
+
             tileMapRenderer = new TileMapRenderer(
                 (int)sender.ActualWidth,
                 (int)sender.ActualHeight,
@@ -254,6 +307,17 @@ namespace GORE.UI
                 throw new InvalidOperationException(
                     "WorldMap.json must contain a 'Terrain' layer with tile data!\n" +
                     "Add a 'tiles' array to the first layer in WorldMap.json");
+            }
+
+            // Load tile textures
+            System.Diagnostics.Debug.WriteLine($"About to load tile textures. TerrainTypes count: {terrainTypes?.Count ?? 0}");
+            if (terrainTypes != null && terrainTypes.Count > 0)
+            {
+                await tileMapRenderer.LoadTileTexturesAsync(sender, terrainTypes);
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine("✗ TerrainTypes is null or empty, cannot load textures!");
             }
 
             // Pass locations to renderer

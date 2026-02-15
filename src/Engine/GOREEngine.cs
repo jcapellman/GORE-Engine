@@ -1,5 +1,3 @@
-using System;
-using System.Runtime.InteropServices;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Windowing;
 using WinRT.Interop;
@@ -42,44 +40,6 @@ namespace GORE.Engine
             _initialized = true;
         }
 
-        /// <summary>
-        /// Initialize and start the GORE Engine with splash screen (legacy overload).
-        /// Call this from your App.xaml.cs OnLaunched method.
-        /// </summary>
-        /// <param name="mainWindow">The main application window</param>
-        [Obsolete("Use StartAsync() without parameters. The engine now creates its own window.")]
-        public static async System.Threading.Tasks.Task StartAsync(Window mainWindow)
-        {
-            if (_initialized) return;
-
-            _mainWindow = mainWindow;
-
-            // Load game configuration
-            var config = await Services.ConfigurationService.LoadConfigurationAsync();
-
-            // Initialize music system
-            // Note: Music files are optional, system will gracefully handle missing files
-
-            // Enter fullscreen and hide cursor
-            EnterFullScreenMode();
-
-            // Show GORE Engine splash screen
-            var splashScreen = new UI.SplashScreen(_mainWindow);
-            splashScreen.Activate();
-
-            _initialized = true;
-        }
-
-        /// <summary>
-        /// Synchronous version of Start (for compatibility)
-        /// </summary>
-        /// <param name="mainWindow">The main application window</param>
-        public static void Start(Window mainWindow)
-        {
-            var task = StartAsync(mainWindow);
-            task.Wait();
-        }
-
         private static void EnterFullScreenMode()
         {
             var hwnd = WindowNative.GetWindowHandle(_mainWindow);
@@ -97,9 +57,6 @@ namespace GORE.Engine
         /// <summary>
         /// Get the loaded game configuration
         /// </summary>
-        public static Models.GameConfiguration GetConfiguration()
-        {
-            return Services.ConfigurationService.GetConfiguration();
-        }
+        public static Models.GameConfiguration GetConfiguration() => Services.ConfigurationService.GetConfiguration();
     }
 }

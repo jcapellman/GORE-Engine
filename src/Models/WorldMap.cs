@@ -32,6 +32,7 @@ namespace GORE.Models
         public int Id { get; set; }
         public string Name { get; set; }
         public string Color { get; set; }
+        public string Texture { get; set; }
         public bool IsWalkable { get; set; }
         public int EncounterRate { get; set; }
     }
