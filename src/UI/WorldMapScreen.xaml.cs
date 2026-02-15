@@ -352,16 +352,21 @@ namespace GORE.UI
                 {
                     float locX = loc.X * scale;
                     float locY = loc.Y * scale;
+                    int locWidth = (loc.Width > 0 ? loc.Width : 1);
+                    int locHeight = (loc.Height > 0 ? loc.Height : 1);
+                    float markerWidth = locWidth * scale;
+                    float markerHeight = locHeight * scale;
 
                     Color markerColor = loc.Type switch
                     {
                         "town" => Color.FromArgb(255, 255, 255, 0),
                         "dungeon" => Color.FromArgb(255, 255, 0, 0),
+                        "castle" => Color.FromArgb(255, 100, 100, 255),
                         _ => Color.FromArgb(255, 255, 255, 255)
                     };
 
-                    // Small square marker
-                    session.FillRectangle(locX - 1, locY - 1, 3, 3, markerColor);
+                    // Draw rectangle marker for multi-tile locations
+                    session.FillRectangle(locX, locY, Math.Max(markerWidth, 2), Math.Max(markerHeight, 2), markerColor);
                 }
             }
 

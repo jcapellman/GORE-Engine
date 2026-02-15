@@ -25,6 +25,8 @@ namespace GORE.Models
         public int Y { get; set; }
         public string Type { get; set; }
         public string Texture { get; set; }
+        public int Width { get; set; } = 1;  // Default to 1 tile
+        public int Height { get; set; } = 1; // Default to 1 tile
         public bool Visited { get; set; }
     }
 

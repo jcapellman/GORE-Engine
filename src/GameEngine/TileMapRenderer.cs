@@ -271,14 +271,20 @@ namespace GORE.GameEngine
 
         private void DrawLocationMarker(CanvasDrawingSession drawSession, float x, float y, WorldMapLocation location)
         {
+            // Calculate size in pixels based on tile count
+            int widthInTiles = location.Width > 0 ? location.Width : 1;
+            int heightInTiles = location.Height > 0 ? location.Height : 1;
+            float width = widthInTiles * tileSize;
+            float height = heightInTiles * tileSize;
+
             // Check if location has a texture
             if (locationTextures.ContainsKey(location.Name))
             {
                 var texture = locationTextures[location.Name];
 
-                // Draw texture with transparency support (alpha blending is automatic with DrawImage)
+                // Draw texture with transparency support, scaled to cover all tiles
                 drawSession.DrawImage(texture,
-                    new Windows.Foundation.Rect(x, y, tileSize, tileSize),
+                    new Windows.Foundation.Rect(x, y, width, height),
                     new Windows.Foundation.Rect(0, 0, texture.SizeInPixels.Width, texture.SizeInPixels.Height));
             }
             else
@@ -292,12 +298,12 @@ namespace GORE.GameEngine
                     _ => Color.FromArgb(255, 255, 255, 255)            // White
                 };
 
-                // Draw a larger, more visible marker
-                drawSession.FillRectangle(x + 2, y + 2, tileSize - 4, tileSize - 4, markerColor);
-                drawSession.DrawRectangle(x + 2, y + 2, tileSize - 4, tileSize - 4, Color.FromArgb(255, 0, 0, 0), 2);
+                // Draw a marker covering all tiles
+                drawSession.FillRectangle(x + 2, y + 2, width - 4, height - 4, markerColor);
+                drawSession.DrawRectangle(x + 2, y + 2, width - 4, height - 4, Color.FromArgb(255, 0, 0, 0), 2);
 
                 // Add a bright center dot for extra visibility
-                drawSession.FillCircle(x + tileSize / 2, y + tileSize / 2, 3, Color.FromArgb(255, 255, 255, 255));
+                drawSession.FillCircle(x + width / 2, y + height / 2, 3, Color.FromArgb(255, 255, 255, 255));
             }
         }
 
