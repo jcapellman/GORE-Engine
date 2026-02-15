@@ -36,6 +36,7 @@ namespace GORE.Models
         public string Name { get; set; }
         public string Color { get; set; }
         public string Texture { get; set; }
+        public string BattleBackground { get; set; }
         public bool IsWalkable { get; set; }
         public int EncounterRate { get; set; }
         public int EncounterZone { get; set; }

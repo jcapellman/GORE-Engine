@@ -313,8 +313,29 @@ namespace GORE.UI
 
             System.Diagnostics.Debug.WriteLine($"Starting battle with {enemies.Count} enemies: {string.Join(", ", enemies.Select(e => e.Name))}");
 
+            // Get battle background based on current terrain
+            string battleBackground = null;
+            var playerPos = tileMapRenderer.GetPlayerPosition();
+            int terrainId = tileMapRenderer.GetTerrainAt((int)playerPos.X, (int)playerPos.Y);
+            var terrain = terrainTypes?.FirstOrDefault(t => t.Id == terrainId);
+
+            System.Diagnostics.Debug.WriteLine($"=== BATTLE TRIGGER ===");
+            System.Diagnostics.Debug.WriteLine($"Player position: ({(int)playerPos.X}, {(int)playerPos.Y})");
+            System.Diagnostics.Debug.WriteLine($"Terrain ID: {terrainId}");
+            System.Diagnostics.Debug.WriteLine($"Terrain name: {terrain?.Name ?? "Unknown"}");
+
+            if (terrain != null && !string.IsNullOrEmpty(terrain.BattleBackground))
+            {
+                battleBackground = terrain.BattleBackground;
+                System.Diagnostics.Debug.WriteLine($"✓ Using battle background: {battleBackground}");
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine($"✗ No battle background configured for this terrain");
+            }
+
             // Open battle screen
-            var battleScreen = new BattleScreen(_mainWindow, party, enemies);
+            var battleScreen = new BattleScreen(_mainWindow, party, enemies, battleBackground);
             battleScreen.Activate();
             Close();
         }

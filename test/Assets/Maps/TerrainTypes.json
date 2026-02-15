@@ -3,6 +3,7 @@
     "id": 0,
     "name": "Water",
     "texture": "Assets/Tiles/Water.png",
+    "battleBackground": "Assets/Backgrounds/Water.png",
     "isWalkable": false,
     "encounterRate": 0,
     "encounterZone": 0,
@@ -16,6 +17,7 @@
     "id": 1,
     "name": "Grass",
     "texture": "Assets/Tiles/Grass.png",
+    "battleBackground": "Assets/Backgrounds/Grass.png",
     "isWalkable": true,
     "encounterRate": 10,
     "encounterZone": 1
@@ -24,6 +26,7 @@
     "id": 2,
     "name": "Sand",
     "texture": "Assets/Tiles/Sand.png",
+    "battleBackground": "Assets/Backgrounds/Desert.png",
     "isWalkable": true,
     "encounterRate": 5,
     "encounterZone": 2

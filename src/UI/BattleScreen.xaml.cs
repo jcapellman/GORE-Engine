@@ -21,16 +21,18 @@ namespace GORE.UI
         private readonly BattleSystem _battleSystem;
         private readonly List<Character> _party;
         private readonly List<Enemy> _enemies;
+        private readonly string _battleBackground;
         private BattleResult _result;
         private bool _battleEnded = false;
         private bool _selectingTarget = false;
 
-        public BattleScreen(Window mainWindow, List<Character> party, List<Enemy> enemies)
+        public BattleScreen(Window mainWindow, List<Character> party, List<Enemy> enemies, string battleBackground = null)
         {
             InitializeComponent();
             _mainWindow = mainWindow;
             _party = party;
             _enemies = enemies;
+            _battleBackground = battleBackground;
             _battleSystem = new BattleSystem();
 
             ExtendsContentIntoTitleBar = true;
@@ -46,7 +48,16 @@ namespace GORE.UI
 
         private async void SetupBattle()
         {
+            // Set default background
+            RootGrid.Background = new SolidColorBrush(Color.FromArgb(255, 26, 0, 51)); // #1a0033
+
             _battleSystem.StartBattle(_party, _enemies);
+
+            // Load battle background
+            if (!string.IsNullOrEmpty(_battleBackground))
+            {
+                await LoadBattleBackgroundAsync(_battleBackground);
+            }
 
             // Setup enemy display
             foreach (var enemy in _enemies)
@@ -71,66 +82,188 @@ namespace GORE.UI
             StartPlayerTurn();
         }
 
+        private async Task LoadBattleBackgroundAsync(string backgroundPath)
+        {
+            try
+            {
+                var baseDirectory = AppContext.BaseDirectory;
+                var fullPath = Path.Combine(baseDirectory, backgroundPath);
+
+                System.Diagnostics.Debug.WriteLine($"=== LOADING BATTLE BACKGROUND ===");
+                System.Diagnostics.Debug.WriteLine($"Background path: {backgroundPath}");
+                System.Diagnostics.Debug.WriteLine($"Full path: {fullPath}");
+                System.Diagnostics.Debug.WriteLine($"File exists: {File.Exists(fullPath)}");
+
+                if (File.Exists(fullPath))
+                {
+                    var bitmap = new BitmapImage(new Uri(fullPath));
+                    var imageBrush = new ImageBrush
+                    {
+                        ImageSource = bitmap,
+                        Stretch = Stretch.UniformToFill
+                    };
+                    RootGrid.Background = imageBrush;
+                    System.Diagnostics.Debug.WriteLine("✓ Battle background loaded successfully");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"✗ Battle background not found: {fullPath}");
+
+                    // List files in the Backgrounds directory
+                    var backgroundsDir = Path.Combine(baseDirectory, "Assets", "Backgrounds");
+                    if (Directory.Exists(backgroundsDir))
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Files in {backgroundsDir}:");
+                        foreach (var file in Directory.GetFiles(backgroundsDir))
+                        {
+                            System.Diagnostics.Debug.WriteLine($"  - {Path.GetFileName(file)}");
+                        }
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Backgrounds directory doesn't exist: {backgroundsDir}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"✗ Error loading battle background: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+            }
+        }
+
         private Border CreateEnemyCard(Enemy enemy)
         {
-            var border = new Border
+            var mainStack = new StackPanel
             {
-                Width = 150,
-                Height = 200,
+                Spacing = 8
+            };
+
+            // Enemy sprite
+            var sprite = new Border
+            {
+                Width = 120,
+                Height = 120,
+                Background = new SolidColorBrush(Color.FromArgb(100, 80, 0, 0)),
                 BorderBrush = new SolidColorBrush(Colors.DarkRed),
                 BorderThickness = new Thickness(2),
-                CornerRadius = new CornerRadius(8),
-                Background = new SolidColorBrush(Color.FromArgb(180, 40, 0, 0)),
+                CornerRadius = new CornerRadius(4),
                 Tag = enemy
-            };
-
-            var stack = new StackPanel
-            {
-                VerticalAlignment = VerticalAlignment.Center,
-                HorizontalAlignment = HorizontalAlignment.Center
-            };
-
-            // Enemy image placeholder
-            var image = new Border
-            {
-                Width = 100,
-                Height = 100,
-                Background = new SolidColorBrush(Colors.DarkGray),
-                CornerRadius = new CornerRadius(50),
-                Margin = new Thickness(0, 0, 0, 10)
             };
 
             // Try to load enemy texture
             if (!string.IsNullOrEmpty(enemy.Texture))
             {
-                _ = LoadEnemyImageAsync(image, enemy.Texture);
+                _ = LoadEnemyImageAsync(sprite, enemy.Texture);
+            }
+            else
+            {
+                // Placeholder icon
+                var placeholderText = new TextBlock
+                {
+                    Text = "👾",
+                    FontSize = 60,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                sprite.Child = placeholderText;
             }
 
+            mainStack.Children.Add(sprite);
+
+            // Enemy name
             var nameText = new TextBlock
             {
                 Text = enemy.Name,
                 Foreground = new SolidColorBrush(Colors.White),
-                FontSize = 16,
+                FontSize = 18,
                 FontWeight = Microsoft.UI.Text.FontWeights.Bold,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                Margin = new Thickness(0, 0, 0, 5)
+                FontFamily = new FontFamily("Consolas"),
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            mainStack.Children.Add(nameText);
+
+            // HP bar container
+            var hpContainer = new StackPanel
+            {
+                Spacing = 4
             };
 
+            var hpLabel = new TextBlock
+            {
+                Text = "HP",
+                Foreground = new SolidColorBrush(Colors.LightGray),
+                FontSize = 12,
+                FontFamily = new FontFamily("Consolas"),
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            hpContainer.Children.Add(hpLabel);
+
+            // HP bar background
+            var hpBarBg = new Border
+            {
+                Width = 100,
+                Height = 12,
+                Background = new SolidColorBrush(Color.FromArgb(255, 40, 40, 40)),
+                BorderBrush = new SolidColorBrush(Colors.Gray),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(2)
+            };
+
+            // HP bar fill
+            var hpBarFill = new Border
+            {
+                Height = 12,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                CornerRadius = new CornerRadius(2),
+                Tag = "hpbar"
+            };
+
+            UpdateEnemyHPBar(hpBarFill, enemy);
+
+            var hpGrid = new Grid();
+            hpGrid.Children.Add(hpBarBg);
+            hpGrid.Children.Add(hpBarFill);
+            hpContainer.Children.Add(hpGrid);
+
+            // HP text
             var hpText = new TextBlock
             {
-                Text = $"HP: {enemy.CurrentHP}/{enemy.MaxHP}",
-                Foreground = new SolidColorBrush(Colors.LightGreen),
-                FontSize = 14,
+                Text = $"{enemy.CurrentHP}/{enemy.MaxHP}",
+                Foreground = new SolidColorBrush(Colors.White),
+                FontSize = 12,
+                FontFamily = new FontFamily("Consolas"),
                 HorizontalAlignment = HorizontalAlignment.Center,
-                Tag = "hp"
+                Tag = "hptext"
+            };
+            hpContainer.Children.Add(hpText);
+
+            mainStack.Children.Add(hpContainer);
+
+            var wrapper = new Border
+            {
+                Child = mainStack,
+                Tag = enemy
             };
 
-            stack.Children.Add(image);
-            stack.Children.Add(nameText);
-            stack.Children.Add(hpText);
-            border.Child = stack;
+            return wrapper;
+        }
 
-            return border;
+        private void UpdateEnemyHPBar(Border hpBar, Enemy enemy)
+        {
+            double hpPercent = (double)enemy.CurrentHP / enemy.MaxHP;
+            hpBar.Width = 100 * hpPercent;
+
+            // Color based on HP percentage
+            Color barColor;
+            if (hpPercent > 0.6)
+                barColor = Color.FromArgb(255, 0, 200, 0); // Green
+            else if (hpPercent > 0.3)
+                barColor = Color.FromArgb(255, 255, 200, 0); // Yellow
+            else
+                barColor = Color.FromArgb(255, 200, 0, 0); // Red
+
+            hpBar.Background = new SolidColorBrush(barColor);
         }
 
         private async Task LoadEnemyImageAsync(Border imageBorder, string texturePath)
@@ -158,66 +291,198 @@ namespace GORE.UI
 
         private Border CreateCharacterCard(Character character)
         {
-            var border = new Border
+            var mainBorder = new Border
             {
-                Width = 150,
-                Height = 180,
-                BorderBrush = new SolidColorBrush(Colors.DarkBlue),
+                Background = new SolidColorBrush(Color.FromArgb(220, 20, 20, 60)),
+                BorderBrush = new SolidColorBrush(Color.FromArgb(255, 65, 105, 225)),
                 BorderThickness = new Thickness(2),
-                CornerRadius = new CornerRadius(8),
-                Background = new SolidColorBrush(Color.FromArgb(180, 0, 0, 40)),
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(12, 8, 12, 8),
                 Tag = character
             };
 
             var stack = new StackPanel
             {
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(10)
+                Spacing = 6
+            };
+
+            // Name and Level
+            var nameStack = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 10
             };
 
             var nameText = new TextBlock
             {
                 Text = character.Name,
                 Foreground = new SolidColorBrush(Colors.Cyan),
-                FontSize = 16,
+                FontSize = 18,
                 FontWeight = Microsoft.UI.Text.FontWeights.Bold,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                Margin = new Thickness(0, 0, 0, 10)
+                FontFamily = new FontFamily("Consolas")
             };
 
             var levelText = new TextBlock
             {
-                Text = $"Lv {character.Level}",
+                Text = $"Lv{character.Level}",
                 Foreground = new SolidColorBrush(Colors.White),
                 FontSize = 14,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                Margin = new Thickness(0, 0, 0, 5)
+                FontFamily = new FontFamily("Consolas"),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            nameStack.Children.Add(nameText);
+            nameStack.Children.Add(levelText);
+            stack.Children.Add(nameStack);
+
+            // HP Bar
+            var hpStack = new StackPanel
+            {
+                Spacing = 3
+            };
+
+            var hpLabelStack = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 5
+            };
+
+            var hpLabel = new TextBlock
+            {
+                Text = "HP",
+                Foreground = new SolidColorBrush(Colors.LightGray),
+                FontSize = 12,
+                FontFamily = new FontFamily("Consolas"),
+                Width = 25
             };
 
             var hpText = new TextBlock
             {
-                Text = $"HP: {character.CurrentHP}/{character.MaxHP}",
-                Foreground = new SolidColorBrush(Colors.LightGreen),
-                FontSize = 14,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                Tag = "hp"
+                Text = $"{character.CurrentHP,3}/{character.MaxHP,3}",
+                Foreground = new SolidColorBrush(Colors.White),
+                FontSize = 12,
+                FontFamily = new FontFamily("Consolas"),
+                Tag = "hptext"
+            };
+
+            hpLabelStack.Children.Add(hpLabel);
+            hpLabelStack.Children.Add(hpText);
+            hpStack.Children.Add(hpLabelStack);
+
+            // HP Bar
+            var hpBarBg = new Border
+            {
+                Width = 150,
+                Height = 14,
+                Background = new SolidColorBrush(Color.FromArgb(255, 40, 40, 40)),
+                BorderBrush = new SolidColorBrush(Colors.Gray),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(2)
+            };
+
+            var hpBarFill = new Border
+            {
+                Height = 14,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                CornerRadius = new CornerRadius(2),
+                Tag = "hpbar"
+            };
+
+            UpdateCharacterHPBar(hpBarFill, character);
+
+            var hpGrid = new Grid();
+            hpGrid.Children.Add(hpBarBg);
+            hpGrid.Children.Add(hpBarFill);
+            hpStack.Children.Add(hpGrid);
+            stack.Children.Add(hpStack);
+
+            // MP Bar
+            var mpStack = new StackPanel
+            {
+                Spacing = 3
+            };
+
+            var mpLabelStack = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 5
+            };
+
+            var mpLabel = new TextBlock
+            {
+                Text = "MP",
+                Foreground = new SolidColorBrush(Colors.LightGray),
+                FontSize = 12,
+                FontFamily = new FontFamily("Consolas"),
+                Width = 25
             };
 
             var mpText = new TextBlock
             {
-                Text = $"MP: {character.CurrentMP}/{character.MaxMP}",
-                Foreground = new SolidColorBrush(Colors.LightBlue),
-                FontSize = 14,
-                HorizontalAlignment = HorizontalAlignment.Center
+                Text = $"{character.CurrentMP,3}/{character.MaxMP,3}",
+                Foreground = new SolidColorBrush(Colors.White),
+                FontSize = 12,
+                FontFamily = new FontFamily("Consolas"),
+                Tag = "mptext"
             };
 
-            stack.Children.Add(nameText);
-            stack.Children.Add(levelText);
-            stack.Children.Add(hpText);
-            stack.Children.Add(mpText);
-            border.Child = stack;
+            mpLabelStack.Children.Add(mpLabel);
+            mpLabelStack.Children.Add(mpText);
+            mpStack.Children.Add(mpLabelStack);
 
-            return border;
+            // MP Bar
+            var mpBarBg = new Border
+            {
+                Width = 150,
+                Height = 14,
+                Background = new SolidColorBrush(Color.FromArgb(255, 40, 40, 40)),
+                BorderBrush = new SolidColorBrush(Colors.Gray),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(2)
+            };
+
+            var mpBarFill = new Border
+            {
+                Height = 14,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Background = new SolidColorBrush(Color.FromArgb(255, 50, 150, 255)),
+                CornerRadius = new CornerRadius(2),
+                Tag = "mpbar"
+            };
+
+            UpdateCharacterMPBar(mpBarFill, character);
+
+            var mpGrid = new Grid();
+            mpGrid.Children.Add(mpBarBg);
+            mpGrid.Children.Add(mpBarFill);
+            mpStack.Children.Add(mpGrid);
+            stack.Children.Add(mpStack);
+
+            mainBorder.Child = stack;
+            return mainBorder;
+        }
+
+        private void UpdateCharacterHPBar(Border hpBar, Character character)
+        {
+            double hpPercent = (double)character.CurrentHP / character.MaxHP;
+            hpBar.Width = 150 * hpPercent;
+
+            // Color based on HP percentage
+            Color barColor;
+            if (hpPercent > 0.6)
+                barColor = Color.FromArgb(255, 0, 200, 0); // Green
+            else if (hpPercent > 0.3)
+                barColor = Color.FromArgb(255, 255, 200, 0); // Yellow
+            else
+                barColor = Color.FromArgb(255, 200, 0, 0); // Red
+
+            hpBar.Background = new SolidColorBrush(barColor);
+        }
+
+        private void UpdateCharacterMPBar(Border mpBar, Character character)
+        {
+            double mpPercent = (double)character.CurrentMP / character.MaxMP;
+            mpBar.Width = 150 * mpPercent;
         }
 
         private void StartPlayerTurn()
@@ -251,14 +516,11 @@ namespace GORE.UI
         {
             ActionMenu.Visibility = Visibility.Collapsed;
             TargetSelection.Visibility = Visibility.Visible;
+            BattleLogScroll.Visibility = Visibility.Collapsed;
             _selectingTarget = true;
 
             // Clear previous target buttons
-            var existingButtons = TargetSelection.Children.OfType<Button>().ToList();
-            foreach (var btn in existingButtons)
-            {
-                TargetSelection.Children.Remove(btn);
-            }
+            TargetButtonPanel.Children.Clear();
 
             // Add target buttons for alive enemies
             int index = 0;
@@ -266,14 +528,20 @@ namespace GORE.UI
             {
                 var button = new Button
                 {
-                    Content = $"{index + 1}. {enemy.Name}",
-                    Width = 150,
-                    Height = 40,
-                    FontSize = 14,
-                    Tag = enemy
+                    Content = $"▶ {enemy.Name}",
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    Height = 45,
+                    FontSize = 18,
+                    FontFamily = new FontFamily("Consolas"),
+                    FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+                    Tag = enemy,
+                    Background = new SolidColorBrush(Color.FromArgb(255, 26, 26, 62)),
+                    Foreground = new SolidColorBrush(Colors.White),
+                    BorderBrush = new SolidColorBrush(Color.FromArgb(255, 65, 105, 225)),
+                    BorderThickness = new Thickness(2)
                 };
                 button.Click += TargetButton_Click;
-                TargetSelection.Children.Add(button);
+                TargetButtonPanel.Children.Add(button);
                 index++;
             }
         }
@@ -286,6 +554,7 @@ namespace GORE.UI
 
             _selectingTarget = false;
             TargetSelection.Visibility = Visibility.Collapsed;
+            BattleLogScroll.Visibility = Visibility.Visible;
 
             var attacker = _party.Where(c => c.IsAlive).FirstOrDefault();
             if (attacker != null)
@@ -334,41 +603,129 @@ namespace GORE.UI
         private void UpdateDisplay()
         {
             // Update enemy cards
-            foreach (Border card in EnemyPanel.Children)
+            foreach (var card in EnemyPanel.Children.OfType<Border>())
             {
                 var enemy = card.Tag as Enemy;
                 if (enemy != null)
                 {
-                    var stack = card.Child as StackPanel;
-                    var hpText = stack?.Children.OfType<TextBlock>().FirstOrDefault(t => t.Tag?.ToString() == "hp");
-                    if (hpText != null)
+                    var mainStack = card.Child as StackPanel;
+                    if (mainStack != null)
                     {
-                        hpText.Text = $"HP: {enemy.CurrentHP}/{enemy.MaxHP}";
-                    }
+                        // Update HP bar
+                        var hpContainer = mainStack.Children.OfType<StackPanel>().LastOrDefault();
+                        if (hpContainer != null)
+                        {
+                            var hpGrid = hpContainer.Children.OfType<Grid>().FirstOrDefault();
+                            if (hpGrid != null)
+                            {
+                                var hpBar = hpGrid.Children.OfType<Border>().FirstOrDefault(b => b.Tag?.ToString() == "hpbar");
+                                if (hpBar != null)
+                                {
+                                    UpdateEnemyHPBar(hpBar, enemy);
+                                }
+                            }
 
-                    if (!enemy.IsAlive)
-                    {
-                        card.Opacity = 0.3;
+                            // Update HP text
+                            var hpText = hpContainer.Children.OfType<TextBlock>().FirstOrDefault(t => t.Tag?.ToString() == "hptext");
+                            if (hpText != null)
+                            {
+                                hpText.Text = $"{enemy.CurrentHP}/{enemy.MaxHP}";
+                            }
+                        }
+
+                        // Fade out defeated enemies
+                        if (!enemy.IsAlive)
+                        {
+                            card.Opacity = 0.3;
+
+                            // Add defeated overlay
+                            var sprite = mainStack.Children.OfType<Border>().FirstOrDefault();
+                            if (sprite != null && sprite.Child == null)
+                            {
+                                var defeatedText = new TextBlock
+                                {
+                                    Text = "✕",
+                                    FontSize = 80,
+                                    Foreground = new SolidColorBrush(Colors.Red),
+                                    HorizontalAlignment = HorizontalAlignment.Center,
+                                    VerticalAlignment = VerticalAlignment.Center
+                                };
+                                var grid = new Grid();
+                                grid.Children.Add(defeatedText);
+                                sprite.Child = grid;
+                            }
+                        }
                     }
                 }
             }
 
             // Update party cards
-            foreach (Border card in PartyPanel.Children)
+            foreach (var card in PartyPanel.Children.OfType<Border>())
             {
                 var character = card.Tag as Character;
                 if (character != null)
                 {
                     var stack = card.Child as StackPanel;
-                    var hpText = stack?.Children.OfType<TextBlock>().FirstOrDefault(t => t.Tag?.ToString() == "hp");
-                    if (hpText != null)
+                    if (stack != null)
                     {
-                        hpText.Text = $"HP: {character.CurrentHP}/{character.MaxHP}";
+                        // Update HP bar
+                        var hpStack = stack.Children.OfType<StackPanel>().Skip(1).FirstOrDefault();
+                        if (hpStack != null)
+                        {
+                            var hpGrid = hpStack.Children.OfType<Grid>().FirstOrDefault();
+                            if (hpGrid != null)
+                            {
+                                var hpBar = hpGrid.Children.OfType<Border>().FirstOrDefault(b => b.Tag?.ToString() == "hpbar");
+                                if (hpBar != null)
+                                {
+                                    UpdateCharacterHPBar(hpBar, character);
+                                }
+                            }
+
+                            // Update HP text
+                            var hpLabelStack = hpStack.Children.OfType<StackPanel>().FirstOrDefault();
+                            if (hpLabelStack != null)
+                            {
+                                var hpText = hpLabelStack.Children.OfType<TextBlock>().FirstOrDefault(t => t.Tag?.ToString() == "hptext");
+                                if (hpText != null)
+                                {
+                                    hpText.Text = $"{character.CurrentHP,3}/{character.MaxHP,3}";
+                                }
+                            }
+                        }
+
+                        // Update MP bar
+                        var mpStack = stack.Children.OfType<StackPanel>().LastOrDefault();
+                        if (mpStack != null)
+                        {
+                            var mpGrid = mpStack.Children.OfType<Grid>().FirstOrDefault();
+                            if (mpGrid != null)
+                            {
+                                var mpBar = mpGrid.Children.OfType<Border>().FirstOrDefault(b => b.Tag?.ToString() == "mpbar");
+                                if (mpBar != null)
+                                {
+                                    UpdateCharacterMPBar(mpBar, character);
+                                }
+                            }
+
+                            // Update MP text
+                            var mpLabelStack = mpStack.Children.OfType<StackPanel>().FirstOrDefault();
+                            if (mpLabelStack != null)
+                            {
+                                var mpText = mpLabelStack.Children.OfType<TextBlock>().FirstOrDefault(t => t.Tag?.ToString() == "mptext");
+                                if (mpText != null)
+                                {
+                                    mpText.Text = $"{character.CurrentMP,3}/{character.MaxMP,3}";
+                                }
+                            }
+                        }
                     }
 
+                    // Fade out fallen characters
                     if (!character.IsAlive)
                     {
-                        card.Opacity = 0.3;
+                        card.Opacity = 0.4;
+                        card.Background = new SolidColorBrush(Color.FromArgb(220, 60, 20, 20));
                     }
                 }
             }
@@ -446,6 +803,7 @@ namespace GORE.UI
             {
                 _selectingTarget = false;
                 TargetSelection.Visibility = Visibility.Collapsed;
+                BattleLogScroll.Visibility = Visibility.Visible;
                 ActionMenu.Visibility = Visibility.Visible;
             }
         }
