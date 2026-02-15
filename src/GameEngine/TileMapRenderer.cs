@@ -12,7 +12,7 @@ namespace GORE.GameEngine
     {
         private readonly int screenWidth;
         private readonly int screenHeight;
-        private readonly int tileSize = 16;
+        private readonly int tileSize = 64; // Larger tiles for FF1 SNES look (was 16)
         private readonly int mapWidth;
         private readonly int mapHeight;
 
