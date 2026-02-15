@@ -7,58 +7,61 @@
     mc:Ignorable="d">
 
     <Grid x:Name="RootGrid" Background="#000000" KeyDown="RootGrid_KeyDown" KeyUp="RootGrid_KeyUp" Loaded="RootGrid_Loaded">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+        <!-- 3D Viewport (fills entire window) -->
+        <Image x:Name="ViewportImage" Stretch="Fill"/>
 
-        <!-- 3D Viewport -->
-        <Border Grid.Row="0" BorderBrush="DarkGray" BorderThickness="2">
-            <Image x:Name="ViewportImage" Stretch="Fill"/>
-        </Border>
-
-        <!-- HUD -->
-        <Grid Grid.Row="1" Background="#1a1a1a" Padding="20">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-
-            <!-- Stats -->
-            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="20">
+        <!-- HUD Overlay - Bottom Left (Health) -->
+        <StackPanel Orientation="Horizontal" 
+                    HorizontalAlignment="Left" 
+                    VerticalAlignment="Bottom"
+                    Margin="30,0,0,30">
+            <Border Background="#330000" 
+                    BorderBrush="#FF0000" 
+                    BorderThickness="3" 
+                    Padding="15,5"
+                    CornerRadius="3">
                 <TextBlock x:Name="HealthText" 
-                          Text="HEALTH: 100"
-                          Foreground="Red"
+                          Text="100"
+                          Foreground="#00FF00"
                           FontFamily="Consolas"
-                          FontSize="20"
-                          FontWeight="Bold"/>
-                <TextBlock x:Name="AmmoText" 
-                          Text="AMMO: 50"
-                          Foreground="Yellow"
-                          FontFamily="Consolas"
-                          FontSize="20"
-                          FontWeight="Bold"/>
-            </StackPanel>
-
-            <!-- Controls Info -->
-            <StackPanel Grid.Column="1" HorizontalAlignment="Center">
-                <TextBlock Text="WASD: Move | ARROWS: Look | SPACE: Shoot | ESC: Menu"
-                          Foreground="LightGray"
-                          FontFamily="Consolas"
-                          FontSize="14"
-                          HorizontalAlignment="Center"/>
-            </StackPanel>
-
-            <!-- Position Debug -->
-            <TextBlock x:Name="PositionText" 
-                      Grid.Column="2"
-                      Text="X: 0.0 Y: 0.0"
-                      Foreground="Cyan"
+                          FontSize="48"
+                          FontWeight="Black"
+                          VerticalAlignment="Center"/>
+            </Border>
+            <TextBlock Text="HEALTH"
+                      Foreground="#888888"
                       FontFamily="Consolas"
                       FontSize="16"
-                      HorizontalAlignment="Right"
-                      VerticalAlignment="Center"/>
-        </Grid>
+                      FontWeight="Bold"
+                      VerticalAlignment="Center"
+                      Margin="10,0,0,0"/>
+        </StackPanel>
+
+        <!-- HUD Overlay - Bottom Right (Ammo) -->
+        <StackPanel Orientation="Horizontal" 
+                    HorizontalAlignment="Right" 
+                    VerticalAlignment="Bottom"
+                    Margin="0,0,30,30">
+            <TextBlock Text="AMMO"
+                      Foreground="#888888"
+                      FontFamily="Consolas"
+                      FontSize="16"
+                      FontWeight="Bold"
+                      VerticalAlignment="Center"
+                      Margin="0,0,10,0"/>
+            <Border Background="#331100" 
+                    BorderBrush="#FFAA00" 
+                    BorderThickness="3" 
+                    Padding="15,5"
+                    CornerRadius="3">
+                <TextBlock x:Name="AmmoText" 
+                          Text="50"
+                          Foreground="#FFFF00"
+                          FontFamily="Consolas"
+                          FontSize="48"
+                          FontWeight="Black"
+                          VerticalAlignment="Center"/>
+            </Border>
+        </StackPanel>
     </Grid>
 </Window>

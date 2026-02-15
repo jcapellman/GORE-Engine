@@ -1,7 +1,9 @@
 using GORE.Engine;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using System;
+using System.IO;
 using System.Numerics;
 using Windows.System;
 
@@ -34,6 +36,9 @@ namespace GORE.UI
         {
             ExtendsContentIntoTitleBar = true;
             ScreenHelper.EnterFullScreenMode(this);
+
+            // Load custom font
+            await LoadCustomFontAsync();
 
             // Load map from file
             var baseDirectory = AppContext.BaseDirectory;
@@ -74,6 +79,36 @@ namespace GORE.UI
             _gameTimer.Interval = TimeSpan.FromMilliseconds(16); // ~60 FPS
             _gameTimer.Tick += GameLoop;
             _gameTimer.Start();
+        }
+
+        private async System.Threading.Tasks.Task LoadCustomFontAsync()
+        {
+            try
+            {
+                var baseDirectory = AppContext.BaseDirectory;
+                var fontPath = Path.Combine(baseDirectory, "gt1", "font.ttf");
+
+                if (File.Exists(fontPath))
+                {
+                    var fontFamily = new FontFamily($"ms-appx:///gt1/font.ttf#GT1");
+
+                    // Apply to HUD text elements
+                    HealthText.FontFamily = fontFamily;
+                    AmmoText.FontFamily = fontFamily;
+
+                    System.Diagnostics.Debug.WriteLine($"✓ Custom font loaded: {fontPath}");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"✗ Font not found: {fontPath} - using default");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"✗ Failed to load custom font: {ex.Message}");
+            }
+
+            await System.Threading.Tasks.Task.CompletedTask;
         }
 
         private void RootGrid_Loaded(object sender, RoutedEventArgs e)
@@ -137,9 +172,9 @@ namespace GORE.UI
 
         private void UpdateHUD()
         {
-            HealthText.Text = $"HEALTH: {_health}";
-            AmmoText.Text = $"AMMO: {_ammo}";
-            PositionText.Text = $"X: {_raycastEngine.PlayerPosition.X:F1} Y: {_raycastEngine.PlayerPosition.Y:F1}";
+            // Quake 3 style - just the numbers
+            HealthText.Text = _health.ToString();
+            AmmoText.Text = _ammo.ToString();
         }
 
         private void RootGrid_KeyDown(object sender, KeyRoutedEventArgs e)
