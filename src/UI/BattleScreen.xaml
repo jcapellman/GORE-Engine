@@ -46,7 +46,7 @@
                     <ColumnDefinition Width="2*"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Left Box: Active Character & Command Menu (FF6 Style) -->
+                <!-- Left Box: Enemy List / Command Menu (FF6 Style) -->
                 <Border Grid.Column="0" 
                        Margin="10"
                        CornerRadius="8"
@@ -61,42 +61,37 @@
                     </Border.Background>
 
                     <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                        </Grid.RowDefinitions>
-
-                        <!-- Active Character Display -->
-                        <Border Grid.Row="0" 
-                               Background="#00000044"
-                               Margin="10,10,10,5"
-                               Padding="10"
-                               CornerRadius="4">
-                            <StackPanel>
-                                <TextBlock x:Name="ActiveCharacterName"
-                                          Text="Terra"
-                                          FontFamily="Consolas"
-                                          FontSize="22"
-                                          FontWeight="Bold"
-                                          Foreground="White"/>
-                                <TextBlock x:Name="ActiveCharacterLevel"
-                                          Text="8"
-                                          FontFamily="Consolas"
-                                          FontSize="36"
-                                          FontWeight="Bold"
-                                          Foreground="White"
-                                          HorizontalAlignment="Right"
-                                          Margin="0,-10,0,0"/>
+                        <!-- Enemy List (shown when not player's turn) -->
+                        <StackPanel x:Name="EnemyList"
+                                   Margin="20"
+                                   Spacing="10"
+                                   Visibility="Visible">
+                            <TextBlock Text="ENEMIES"
+                                      FontFamily="Consolas"
+                                      FontSize="20"
+                                      FontWeight="Bold"
+                                      Foreground="Yellow"
+                                      Margin="0,0,0,10"/>
+                            <StackPanel x:Name="EnemyStatusList"
+                                       Spacing="8">
+                                <!-- Enemy rows added dynamically -->
                             </StackPanel>
-                        </Border>
+                        </StackPanel>
 
-                        <!-- Action Menu -->
+                        <!-- Action Menu (shown on player's turn) -->
                         <StackPanel x:Name="ActionMenu" 
-                                   Grid.Row="1"
                                    VerticalAlignment="Center"
-                                   Margin="20,0,20,20"
+                                   Margin="20"
                                    Spacing="15"
                                    Visibility="Collapsed">
+                            <TextBlock x:Name="ActiveCharacterName"
+                                      Text="Terra"
+                                      FontFamily="Consolas"
+                                      FontSize="22"
+                                      FontWeight="Bold"
+                                      Foreground="Cyan"
+                                      Margin="0,0,0,10"
+                                      HorizontalAlignment="Center"/>
                             <Button x:Name="AttackButton" 
                                    Content="⚔ Fight" 
                                    HorizontalAlignment="Stretch"
@@ -137,7 +132,6 @@
 
                         <!-- Status Text -->
                         <TextBlock x:Name="StatusText" 
-                                  Grid.Row="1"
                                   Text="Press ENTER to continue..." 
                                   Foreground="Yellow" 
                                   FontSize="18"
@@ -151,7 +145,7 @@
                     </Grid>
                 </Border>
 
-                <!-- Right Box: Party Status List (FF6 Style) -->
+                <!-- Right Box: Party Status (FF6 Style) -->
                 <Border Grid.Column="1" 
                        Margin="10"
                        CornerRadius="8"
@@ -194,21 +188,6 @@
                                 </StackPanel>
                             </StackPanel>
                         </Grid>
-
-                        <!-- Battle Log Overlay -->
-                        <ScrollViewer x:Name="BattleLogScroll"
-                                     Background="#000000cc"
-                                     Margin="15"
-                                     VerticalScrollBarVisibility="Auto"
-                                     Visibility="Collapsed">
-                            <TextBlock x:Name="BattleLogText" 
-                                      TextWrapping="Wrap" 
-                                      FontFamily="Consolas" 
-                                      FontSize="16" 
-                                      Foreground="White"
-                                      LineHeight="22"
-                                      Padding="10"/>
-                        </ScrollViewer>
                     </Grid>
                 </Border>
             </Grid>

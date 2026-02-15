@@ -81,10 +81,10 @@ namespace GORE.UI
             // Setup party status list (bottom right box - FF6 style)
             SetupPartyStatusList();
 
-            // Add initial battle text
-            await AddBattleText("Battle Start!");
-            await Task.Delay(500);
-            await AddBattleText($"Encountered {_enemies.Count} enemies!");
+            // Setup enemy status list (bottom left box)
+            SetupEnemyStatusList();
+
+            // No battle text - removed event log
             await Task.Delay(1000);
 
             StartPlayerTurn();
@@ -102,9 +102,9 @@ namespace GORE.UI
                     Tag = character
                 };
 
-                statusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });
+                statusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
                 statusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                statusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
+                statusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(80) });
 
                 // Character name
                 var nameText = new TextBlock
@@ -113,15 +113,16 @@ namespace GORE.UI
                     Foreground = new SolidColorBrush(Colors.White),
                     FontSize = 18,
                     FontFamily = new FontFamily("Consolas"),
+                    FontWeight = Microsoft.UI.Text.FontWeights.Bold,
                     VerticalAlignment = VerticalAlignment.Center
                 };
                 Grid.SetColumn(nameText, 0);
                 statusRow.Children.Add(nameText);
 
-                // HP display
+                // HP display (Current/Max)
                 var hpText = new TextBlock
                 {
-                    Text = $"{character.CurrentHP,3}/ {character.MaxHP,3}",
+                    Text = $"{character.CurrentHP,3}/{character.MaxHP,3}",
                     Foreground = new SolidColorBrush(Colors.White),
                     FontSize = 16,
                     FontFamily = new FontFamily("Consolas"),
@@ -132,21 +133,41 @@ namespace GORE.UI
                 Grid.SetColumn(hpText, 1);
                 statusRow.Children.Add(hpText);
 
-                // Action display
-                var actionText = new TextBlock
+                // MP display
+                var mpText = new TextBlock
                 {
-                    Text = "Ready",
-                    Foreground = new SolidColorBrush(Colors.LightGray),
+                    Text = $"{character.CurrentMP,3}",
+                    Foreground = new SolidColorBrush(Colors.Cyan),
                     FontSize = 16,
                     FontFamily = new FontFamily("Consolas"),
                     HorizontalAlignment = HorizontalAlignment.Right,
                     VerticalAlignment = VerticalAlignment.Center,
-                    Tag = "action"
+                    Tag = "mp"
                 };
-                Grid.SetColumn(actionText, 2);
-                statusRow.Children.Add(actionText);
+                Grid.SetColumn(mpText, 2);
+                statusRow.Children.Add(mpText);
 
                 PartyStatusList.Children.Add(statusRow);
+            }
+        }
+
+        private void SetupEnemyStatusList()
+        {
+            EnemyStatusList.Children.Clear();
+
+            foreach (var enemy in _enemies)
+            {
+                var enemyRow = new TextBlock
+                {
+                    Text = enemy.Name,
+                    Foreground = new SolidColorBrush(Colors.White),
+                    FontSize = 18,
+                    FontFamily = new FontFamily("Consolas"),
+                    Margin = new Thickness(0, 2, 0, 2),
+                    Tag = enemy
+                };
+
+                EnemyStatusList.Children.Add(enemyRow);
             }
         }
 
@@ -489,17 +510,14 @@ namespace GORE.UI
                 return;
             }
 
-            _ = AddBattleText($"\n{currentChar.Name}'s turn!");
-
-            // Update active character display (left box)
+            // Update active character display
             ActiveCharacterName.Text = currentChar.Name;
-            ActiveCharacterLevel.Text = currentChar.Level.ToString();
 
-            // Show action menu, hide target selection and battle log
+            // Switch from enemy list to action menu
+            EnemyList.Visibility = Visibility.Collapsed;
             ActionMenu.Visibility = Visibility.Visible;
             TargetSelection.Visibility = Visibility.Collapsed;
             StatusText.Visibility = Visibility.Collapsed;
-            BattleLogScroll.Visibility = Visibility.Collapsed;
 
             // Setup keyboard navigation for action menu
             _selectedMenuIndex = 0;
@@ -537,7 +555,6 @@ namespace GORE.UI
         {
             ActionMenu.Visibility = Visibility.Collapsed;
             TargetSelection.Visibility = Visibility.Visible;
-            BattleLogScroll.Visibility = Visibility.Collapsed;
             PartyStatusList.Visibility = Visibility.Collapsed; // Hide party status during targeting
             _selectingTarget = true;
 
@@ -612,8 +629,7 @@ namespace GORE.UI
 
             _selectingTarget = false;
             TargetSelection.Visibility = Visibility.Collapsed;
-            BattleLogScroll.Visibility = Visibility.Visible; // Show battle log during attack
-            PartyStatusList.Visibility = Visibility.Collapsed; // Keep party status hidden during action
+            PartyStatusList.Visibility = Visibility.Visible; // Restore party status
 
             var attacker = _party.Where(c => c.IsAlive).FirstOrDefault();
             if (attacker != null)
@@ -627,10 +643,9 @@ namespace GORE.UI
                 // Show damage text on enemy
                 await ShowDamageText(target, damage);
 
-                // Execute attack
-                string message = _battleSystem.ExecuteAttack(attacker, target);
-                await AddBattleText(message);
-                await Task.Delay(500);
+                // Execute attack (no battle log)
+                _battleSystem.ExecuteAttack(attacker, target);
+                await Task.Delay(800);
 
                 UpdateDisplay();
 
@@ -704,13 +719,17 @@ namespace GORE.UI
 
         private async Task ExecuteEnemyPhase()
         {
-            await AddBattleText("\n--- Enemy Turn ---");
+            // Show enemy list during their turn
+            ActionMenu.Visibility = Visibility.Collapsed;
+            EnemyList.Visibility = Visibility.Visible;
+
             await Task.Delay(500);
 
             var messages = _battleSystem.ExecuteEnemyTurn();
+
+            // Show damage to party members
             foreach (var msg in messages)
             {
-                await AddBattleText(msg);
                 await Task.Delay(800);
             }
 
@@ -739,6 +758,17 @@ namespace GORE.UI
                     {
                         _ = FadeOutEnemyAsync(card);
                     }
+                }
+            }
+
+            // Update enemy status list (left box)
+            foreach (var enemyText in EnemyStatusList.Children.OfType<TextBlock>())
+            {
+                var enemy = enemyText.Tag as Enemy;
+                if (enemy != null && !enemy.IsAlive)
+                {
+                    enemyText.Foreground = new SolidColorBrush(Colors.Gray);
+                    enemyText.Opacity = 0.5;
                 }
             }
 
@@ -822,7 +852,13 @@ namespace GORE.UI
                     var hpText = statusRow.Children.OfType<TextBlock>().FirstOrDefault(t => t.Tag?.ToString() == "hp");
                     if (hpText != null)
                     {
-                        hpText.Text = $"{character.CurrentHP,3}/ {character.MaxHP,3}";
+                        hpText.Text = $"{character.CurrentHP,3}/{character.MaxHP,3}";
+                    }
+
+                    var mpText = statusRow.Children.OfType<TextBlock>().FirstOrDefault(t => t.Tag?.ToString() == "mp");
+                    if (mpText != null)
+                    {
+                        mpText.Text = $"{character.CurrentMP,3}";
                     }
                 }
             }
@@ -863,22 +899,6 @@ namespace GORE.UI
             }
         }
 
-        private async Task AddBattleText(string text)
-        {
-            DispatcherQueue.TryEnqueue(() =>
-            {
-                if (!string.IsNullOrEmpty(BattleLogText.Text))
-                {
-                    BattleLogText.Text += "\n";
-                }
-                BattleLogText.Text += text;
-
-                BattleLogScroll.ChangeView(null, BattleLogScroll.ScrollableHeight, null);
-            });
-
-            await Task.Delay(50); // Small delay to ensure UI updates
-        }
-
         private async void EndBattle()
         {
             _battleEnded = true;
@@ -886,30 +906,20 @@ namespace GORE.UI
 
             ActionMenu.Visibility = Visibility.Collapsed;
             TargetSelection.Visibility = Visibility.Collapsed;
+            EnemyList.Visibility = Visibility.Collapsed;
 
             await Task.Delay(1000);
 
             if (_result.Victory)
             {
-                await AddBattleText("\n=== VICTORY! ===");
-                await Task.Delay(500);
-                await AddBattleText($"Gained {_result.TotalExp} EXP!");
-                await AddBattleText($"Gained {_result.TotalGold} Gold!");
-
-                foreach (var levelUp in _result.LevelUps)
-                {
-                    await Task.Delay(300);
-                    await AddBattleText($"★ {levelUp}");
-                }
+                // Show victory status
+                StatusText.Text = $"VICTORY!\n{_result.TotalExp} EXP | {_result.TotalGold} Gold\n\nPress ENTER";
             }
             else
             {
-                await AddBattleText("\n=== DEFEAT ===");
-                await AddBattleText("Game Over...");
+                StatusText.Text = "DEFEAT...\n\nPress ENTER";
             }
 
-            await Task.Delay(1000);
-            StatusText.Text = "Press ENTER to continue...";
             StatusText.Visibility = Visibility.Visible;
         }
 
@@ -965,7 +975,6 @@ namespace GORE.UI
                     // Cancel target selection
                     _selectingTarget = false;
                     TargetSelection.Visibility = Visibility.Collapsed;
-                    BattleLogScroll.Visibility = Visibility.Collapsed;
                     PartyStatusList.Visibility = Visibility.Visible; // Restore party status
                     ActionMenu.Visibility = Visibility.Visible;
                     _selectedMenuIndex = 0;
