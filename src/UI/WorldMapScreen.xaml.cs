@@ -58,15 +58,54 @@ namespace GORE.UI
                 var baseDirectory = AppContext.BaseDirectory;
                 var mapPath = Path.Combine(baseDirectory, "Assets", "Maps", "WorldMap.json");
 
+                System.Diagnostics.Debug.WriteLine($"=== LOADING WORLD MAP ===");
+                System.Diagnostics.Debug.WriteLine($"Base Directory: {baseDirectory}");
+                System.Diagnostics.Debug.WriteLine($"Map Path: {mapPath}");
+                System.Diagnostics.Debug.WriteLine($"File Exists: {File.Exists(mapPath)}");
+
                 if (File.Exists(mapPath))
                 {
                     var json = await File.ReadAllTextAsync(mapPath);
-                    worldMap = JsonSerializer.Deserialize<WorldMap>(json);
-                    System.Diagnostics.Debug.WriteLine($"✓ Loaded world map: {worldMap.Name}");
+                    System.Diagnostics.Debug.WriteLine($"JSON Content Length: {json.Length}");
+                    System.Diagnostics.Debug.WriteLine($"JSON First 100 chars: {json.Substring(0, Math.Min(100, json.Length))}");
+
+                    var options = new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    };
+                    worldMap = JsonSerializer.Deserialize<WorldMap>(json, options);
+
+                    System.Diagnostics.Debug.WriteLine($"✓ Loaded world map: {worldMap?.Name}");
+                    System.Diagnostics.Debug.WriteLine($"  Width: {worldMap?.Width}, Height: {worldMap?.Height}");
+                    System.Diagnostics.Debug.WriteLine($"  Locations: {worldMap?.Locations?.Count ?? 0}");
+
+                    if (worldMap?.Locations != null)
+                    {
+                        foreach (var loc in worldMap.Locations)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"    - {loc.Name} at ({loc.X}, {loc.Y}) [{loc.Type}]");
+                        }
+                    }
                 }
                 else
                 {
-                    System.Diagnostics.Debug.WriteLine($"✗ World map not found, using default");
+                    System.Diagnostics.Debug.WriteLine($"✗ World map not found at: {mapPath}");
+
+                    // List what files ARE in Assets/Maps
+                    var mapsDir = Path.Combine(baseDirectory, "Assets", "Maps");
+                    if (Directory.Exists(mapsDir))
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Files in {mapsDir}:");
+                        foreach (var file in Directory.GetFiles(mapsDir))
+                        {
+                            System.Diagnostics.Debug.WriteLine($"  - {Path.GetFileName(file)}");
+                        }
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Directory doesn't exist: {mapsDir}");
+                    }
+
                     CreateDefaultWorldMap();
                 }
 
@@ -75,6 +114,7 @@ namespace GORE.UI
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"✗ Error loading world map: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
                 CreateDefaultWorldMap();
             }
         }

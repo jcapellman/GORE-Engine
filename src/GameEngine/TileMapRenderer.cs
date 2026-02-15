@@ -145,7 +145,42 @@ namespace GORE.GameEngine
             float playerScreenX = (tilesWide / 2) * tileSize;
             float playerScreenY = (tilesHigh / 2) * tileSize;
 
+            // Draw location markers BEFORE player so player is on top
+            if (Locations != null)
+            {
+                foreach (var location in Locations)
+                {
+                    int screenX = (int)((location.X - cameraX) * tileSize);
+                    int screenY = (int)((location.Y - cameraY) * tileSize);
+
+                    // Only draw if on screen
+                    if (screenX >= -tileSize && screenX < screenWidth + tileSize && 
+                        screenY >= -tileSize && screenY < screenHeight + tileSize)
+                    {
+                        DrawLocationMarker(drawSession, screenX, screenY, location);
+                    }
+                }
+            }
+
             DrawPlayerSprite(drawSession, playerScreenX, playerScreenY);
+        }
+
+        private void DrawLocationMarker(CanvasDrawingSession drawSession, float x, float y, WorldMapLocation location)
+        {
+            Color markerColor = location.Type switch
+            {
+                "town" => Color.FromArgb(255, 255, 255, 0),        // Bright Yellow
+                "dungeon" => Color.FromArgb(255, 255, 0, 0),       // Bright Red
+                "castle" => Color.FromArgb(255, 100, 100, 255),    // Bright Blue
+                _ => Color.FromArgb(255, 255, 255, 255)            // White
+            };
+
+            // Draw a larger, more visible marker
+            drawSession.FillRectangle(x + 2, y + 2, tileSize - 4, tileSize - 4, markerColor);
+            drawSession.DrawRectangle(x + 2, y + 2, tileSize - 4, tileSize - 4, Color.FromArgb(255, 0, 0, 0), 2);
+
+            // Add a bright center dot for extra visibility
+            drawSession.FillCircle(x + tileSize / 2, y + tileSize / 2, 3, Color.FromArgb(255, 255, 255, 255));
         }
 
         private void DrawPlayerSprite(CanvasDrawingSession drawSession, float x, float y)
