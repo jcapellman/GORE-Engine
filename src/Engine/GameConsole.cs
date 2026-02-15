@@ -12,6 +12,7 @@ namespace GORE.Engine
         private readonly List<string> _commandHistory = new();
         private int _commandHistoryIndex = -1;
         private const int MaxHistoryLines = 100;
+        private GameConfig _config;
 
         public event Action OnHistoryChanged;
 
@@ -20,6 +21,12 @@ namespace GORE.Engine
         public GameConsole()
         {
             RegisterDefaultCommands();
+        }
+
+        public void SetConfig(GameConfig config)
+        {
+            _config = config;
+            RegisterConfigCommands();
         }
 
         private void RegisterDefaultCommands()
@@ -223,6 +230,179 @@ namespace GORE.Engine
             RegisterCommand("noclip", "Toggle noclip mode (walk through walls)", args =>
             {
                 AddToHistory("Noclip mode not yet implemented");
+            });
+        }
+
+        private void RegisterConfigCommands()
+        {
+            RegisterCommand("cvarlist", "List all config variables", args =>
+            {
+                if (_config == null)
+                {
+                    AddToHistory("Config system not initialized");
+                    return;
+                }
+
+                var filter = args.Length > 0 ? args[0] : "";
+                var variables = string.IsNullOrEmpty(filter) 
+                    ? _config.Variables.Values.ToList() 
+                    : _config.Find(filter);
+
+                AddToHistory($"Config Variables (showing {variables.Count}):");
+                foreach (var variable in variables.OrderBy(v => v.Name))
+                {
+                    var flags = new List<string>();
+                    if (variable.Flags.HasFlag(ConfigVariableFlags.Archive)) flags.Add("A");
+                    if (variable.Flags.HasFlag(ConfigVariableFlags.ReadOnly)) flags.Add("R");
+                    if (variable.Flags.HasFlag(ConfigVariableFlags.Cheat)) flags.Add("C");
+
+                    var flagStr = flags.Count > 0 ? $"[{string.Join("", flags)}] " : "";
+                    AddToHistory($"  {flagStr}{variable.Name} = {variable} - {variable.Description}");
+                }
+            });
+
+            RegisterCommand("set", "Set a config variable (usage: set <name> <value>)", args =>
+            {
+                if (_config == null)
+                {
+                    AddToHistory("Config system not initialized");
+                    return;
+                }
+
+                if (args.Length < 2)
+                {
+                    AddToHistory("Usage: set <variable> <value>");
+                    return;
+                }
+
+                var name = args[0];
+                var value = string.Join(" ", args.Skip(1));
+
+                var variable = _config.Get(name);
+                if (variable == null)
+                {
+                    AddToHistory($"Unknown variable: {name}");
+                    AddToHistory("Use 'cvarlist' to see available variables");
+                    return;
+                }
+
+                variable.SetValue(value);
+                AddToHistory($"{variable.Name} = {variable}");
+            });
+
+            RegisterCommand("get", "Get a config variable value", args =>
+            {
+                if (_config == null)
+                {
+                    AddToHistory("Config system not initialized");
+                    return;
+                }
+
+                if (args.Length == 0)
+                {
+                    AddToHistory("Usage: get <variable>");
+                    return;
+                }
+
+                var variable = _config.Get(args[0]);
+                if (variable == null)
+                {
+                    AddToHistory($"Unknown variable: {args[0]}");
+                    return;
+                }
+
+                AddToHistory($"{variable.Name} = {variable}");
+                if (!string.IsNullOrEmpty(variable.Description))
+                {
+                    AddToHistory($"  {variable.Description}");
+                }
+            });
+
+            RegisterCommand("toggle", "Toggle a boolean config variable", args =>
+            {
+                if (_config == null)
+                {
+                    AddToHistory("Config system not initialized");
+                    return;
+                }
+
+                if (args.Length == 0)
+                {
+                    AddToHistory("Usage: toggle <variable>");
+                    return;
+                }
+
+                var variable = _config.Get(args[0]);
+                if (variable == null)
+                {
+                    AddToHistory($"Unknown variable: {args[0]}");
+                    return;
+                }
+
+                try
+                {
+                    var currentValue = variable.GetValue<bool>();
+                    variable.SetValue(!currentValue);
+                    AddToHistory($"{variable.Name} = {variable}");
+                }
+                catch
+                {
+                    AddToHistory($"{variable.Name} is not a boolean variable");
+                }
+            });
+
+            RegisterCommand("reset", "Reset a config variable to default", args =>
+            {
+                if (_config == null)
+                {
+                    AddToHistory("Config system not initialized");
+                    return;
+                }
+
+                if (args.Length == 0)
+                {
+                    AddToHistory("Usage: reset <variable>");
+                    return;
+                }
+
+                var variable = _config.Get(args[0]);
+                if (variable == null)
+                {
+                    AddToHistory($"Unknown variable: {args[0]}");
+                    return;
+                }
+
+                variable.Reset();
+                AddToHistory($"{variable.Name} reset to {variable}");
+            });
+
+            RegisterCommand("writeconfig", "Save config to config.json", args =>
+            {
+                if (_config == null)
+                {
+                    AddToHistory("Config system not initialized");
+                    return;
+                }
+
+                _config.SaveConfig();
+                AddToHistory("Configuration saved to config.json");
+            });
+
+            RegisterCommand("exec", "Execute config file", args =>
+            {
+                if (_config == null)
+                {
+                    AddToHistory("Config system not initialized");
+                    return;
+                }
+
+                if (args.Length == 0)
+                {
+                    AddToHistory("Usage: exec <filename>");
+                    return;
+                }
+
+                AddToHistory("Config file execution not yet implemented");
             });
         }
     }

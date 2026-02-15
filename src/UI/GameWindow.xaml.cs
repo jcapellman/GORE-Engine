@@ -18,6 +18,7 @@ namespace GORE.UI
         private Renderer3D _renderer;
         private bool _isGameLoopRunning;
         private GameConsole _console;
+        private GameConfig _config;
         private bool _consoleVisible;
 
         private bool _moveForward;
@@ -38,16 +39,39 @@ namespace GORE.UI
         public GameWindow()
         {
             InitializeComponent();
+            InitializeConfig();
             InitializeConsole();
             _ = InitializeGameAsync();
+        }
+
+        private void InitializeConfig()
+        {
+            _config = new GameConfig();
+            _config.LoadConfig();
+
+            // Subscribe to important config changes
+            var renderWidthVar = _config.Get("r_width");
+            var renderHeightVar = _config.Get("r_height");
+
+            renderWidthVar.OnChanged += OnRenderResolutionChanged;
+            renderHeightVar.OnChanged += OnRenderResolutionChanged;
+        }
+
+        private void OnRenderResolutionChanged(ConfigVariable variable)
+        {
+            // Resolution change will require renderer recreation
+            _console?.AddToHistory($"{variable.Name} changed to {variable}");
+            _console?.AddToHistory("Resolution changes will take effect on map reload");
         }
 
         private void InitializeConsole()
         {
             _console = new GameConsole();
+            _console.SetConfig(_config);
             _console.OnHistoryChanged += UpdateConsoleDisplay;
             _console.AddToHistory("GORE Engine Console");
             _console.AddToHistory("Type 'help' for available commands");
+            _console.AddToHistory("Type 'cvarlist' to see config variables");
             _console.AddToHistory("");
         }
 
@@ -81,9 +105,13 @@ namespace GORE.UI
             _raycastEngine = new RaycastEngine(mapData.Grid);
             _raycastEngine.PlayerPosition = mapData.PlayerStart;
 
-            // Initialize renderer with lower resolution for better performance
-            // Image will be scaled up by the Image control
-            _renderer = new Renderer3D(640, 480, _raycastEngine);
+            // Initialize renderer with resolution from config
+            int renderWidth = _config.GetValue("r_width", 640);
+            int renderHeight = _config.GetValue("r_height", 480);
+
+            _renderer = new Renderer3D(renderWidth, renderHeight, _raycastEngine);
+
+            _console.AddToHistory($"Renderer initialized at {renderWidth}x{renderHeight}");
 
             // Load textures
             foreach (var texMapping in mapData.TextureMapping)
@@ -220,8 +248,10 @@ namespace GORE.UI
                 _raycastEngine = new RaycastEngine(mapData.Grid);
                 _raycastEngine.PlayerPosition = mapData.PlayerStart;
 
-                // Update renderer
-                _renderer = new Renderer3D(640, 480, _raycastEngine);
+                // Update renderer with resolution from config
+                int renderWidth = _config.GetValue("r_width", 640);
+                int renderHeight = _config.GetValue("r_height", 480);
+                _renderer = new Renderer3D(renderWidth, renderHeight, _raycastEngine);
 
                 // Load textures for the new map
                 foreach (var texMapping in mapData.TextureMapping)
@@ -321,6 +351,7 @@ namespace GORE.UI
             }
 
             // Rotation
+            float mouseSensitivity = _config.GetValue("m_sensitivity", 0.002f);
             float rotSpeed = 2.0f * deltaTime;
             if (_turnLeft)
                 _raycastEngine.RotatePlayer(rotSpeed);
@@ -334,15 +365,21 @@ namespace GORE.UI
             HealthText.Text = _health.ToString();
             AmmoText.Text = _ammo.ToString();
 
-            // Update FPS counter
-            _frameCount++;
-            var elapsed = (DateTime.Now - _lastFpsUpdate).TotalSeconds;
-            if (elapsed >= 1.0)
+            // Update FPS counter based on config
+            bool showFps = _config.GetValue("r_showfps", true);
+            FpsText.Visibility = showFps ? Visibility.Visible : Visibility.Collapsed;
+
+            if (showFps)
             {
-                var fps = (int)(_frameCount / elapsed);
-                FpsText.Text = $"{fps}fps";
-                _frameCount = 0;
-                _lastFpsUpdate = DateTime.Now;
+                _frameCount++;
+                var elapsed = (DateTime.Now - _lastFpsUpdate).TotalSeconds;
+                if (elapsed >= 1.0)
+                {
+                    var fps = (int)(_frameCount / elapsed);
+                    FpsText.Text = $"{fps}fps";
+                    _frameCount = 0;
+                    _lastFpsUpdate = DateTime.Now;
+                }
             }
         }
 
@@ -512,6 +549,10 @@ namespace GORE.UI
                         {
                             _isGameLoopRunning = false;
                             CompositionTarget.Rendering -= OnRendering;
+
+                            // Save config on exit
+                            _config?.SaveConfig();
+
                             Close();
                         }
                     }
