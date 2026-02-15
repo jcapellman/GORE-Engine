@@ -20,20 +20,20 @@
 
             <!-- Battle Area (Top Section) -->
             <Grid Grid.Row="0">
-                <!-- Enemy Area (Right Side) -->
+                <!-- Enemy Area (LEFT Side - Classic FF) -->
                 <StackPanel x:Name="EnemyPanel" 
                            VerticalAlignment="Center" 
-                           HorizontalAlignment="Right"
-                           Margin="0,0,80,0"
+                           HorizontalAlignment="Left"
+                           Margin="80,0,0,0"
                            Spacing="30">
                     <!-- Enemies will be added dynamically -->
                 </StackPanel>
 
-                <!-- Party Area (Left Side) -->
+                <!-- Party Area (RIGHT Side - Classic FF) -->
                 <StackPanel x:Name="PartyPanel" 
                            VerticalAlignment="Center" 
-                           HorizontalAlignment="Left"
-                           Margin="80,0,0,0"
+                           HorizontalAlignment="Right"
+                           Margin="0,0,80,0"
                            Spacing="20">
                     <!-- Party members will be added dynamically -->
                 </StackPanel>

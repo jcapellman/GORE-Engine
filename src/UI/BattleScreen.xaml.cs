@@ -26,6 +26,11 @@ namespace GORE.UI
         private bool _battleEnded = false;
         private bool _selectingTarget = false;
 
+        // Keyboard navigation
+        private int _selectedMenuIndex = 0;
+        private int _selectedTargetIndex = 0;
+        private List<Button> _currentMenuButtons = new();
+
         public BattleScreen(Window mainWindow, List<Character> party, List<Enemy> enemies, string battleBackground = null)
         {
             InitializeComponent();
@@ -179,66 +184,13 @@ namespace GORE.UI
                 FontSize = 18,
                 FontWeight = Microsoft.UI.Text.FontWeights.Bold,
                 FontFamily = new FontFamily("Consolas"),
-                HorizontalAlignment = HorizontalAlignment.Center
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Tag = "name"
             };
             mainStack.Children.Add(nameText);
 
-            // HP bar container
-            var hpContainer = new StackPanel
-            {
-                Spacing = 4
-            };
-
-            var hpLabel = new TextBlock
-            {
-                Text = "HP",
-                Foreground = new SolidColorBrush(Colors.LightGray),
-                FontSize = 12,
-                FontFamily = new FontFamily("Consolas"),
-                HorizontalAlignment = HorizontalAlignment.Center
-            };
-            hpContainer.Children.Add(hpLabel);
-
-            // HP bar background
-            var hpBarBg = new Border
-            {
-                Width = 100,
-                Height = 12,
-                Background = new SolidColorBrush(Color.FromArgb(255, 40, 40, 40)),
-                BorderBrush = new SolidColorBrush(Colors.Gray),
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(2)
-            };
-
-            // HP bar fill
-            var hpBarFill = new Border
-            {
-                Height = 12,
-                HorizontalAlignment = HorizontalAlignment.Left,
-                CornerRadius = new CornerRadius(2),
-                Tag = "hpbar"
-            };
-
-            UpdateEnemyHPBar(hpBarFill, enemy);
-
-            var hpGrid = new Grid();
-            hpGrid.Children.Add(hpBarBg);
-            hpGrid.Children.Add(hpBarFill);
-            hpContainer.Children.Add(hpGrid);
-
-            // HP text
-            var hpText = new TextBlock
-            {
-                Text = $"{enemy.CurrentHP}/{enemy.MaxHP}",
-                Foreground = new SolidColorBrush(Colors.White),
-                FontSize = 12,
-                FontFamily = new FontFamily("Consolas"),
-                HorizontalAlignment = HorizontalAlignment.Center,
-                Tag = "hptext"
-            };
-            hpContainer.Children.Add(hpText);
-
-            mainStack.Children.Add(hpContainer);
+            // NO HP BAR - just like Final Fantasy!
+            // You never see enemy HP in classic FF
 
             var wrapper = new Border
             {
@@ -247,23 +199,6 @@ namespace GORE.UI
             };
 
             return wrapper;
-        }
-
-        private void UpdateEnemyHPBar(Border hpBar, Enemy enemy)
-        {
-            double hpPercent = (double)enemy.CurrentHP / enemy.MaxHP;
-            hpBar.Width = 100 * hpPercent;
-
-            // Color based on HP percentage
-            Color barColor;
-            if (hpPercent > 0.6)
-                barColor = Color.FromArgb(255, 0, 200, 0); // Green
-            else if (hpPercent > 0.3)
-                barColor = Color.FromArgb(255, 255, 200, 0); // Yellow
-            else
-                barColor = Color.FromArgb(255, 200, 0, 0); // Red
-
-            hpBar.Background = new SolidColorBrush(barColor);
         }
 
         private async Task LoadEnemyImageAsync(Border imageBorder, string texturePath)
@@ -501,10 +436,37 @@ namespace GORE.UI
             }
 
             _ = AddBattleText($"\n{currentChar.Name}'s turn!");
-            
+
             ActionMenu.Visibility = Visibility.Visible;
             TargetSelection.Visibility = Visibility.Collapsed;
             StatusText.Visibility = Visibility.Collapsed;
+            BattleLogScroll.Visibility = Visibility.Visible;
+
+            // Setup keyboard navigation for action menu
+            _selectedMenuIndex = 0;
+            _currentMenuButtons = new List<Button> { AttackButton };
+            UpdateMenuHighlight();
+        }
+
+        private void UpdateMenuHighlight()
+        {
+            for (int i = 0; i < _currentMenuButtons.Count; i++)
+            {
+                if (i == _selectedMenuIndex)
+                {
+                    // Highlight selected
+                    _currentMenuButtons[i].Background = new SolidColorBrush(Color.FromArgb(255, 65, 105, 225));
+                    _currentMenuButtons[i].BorderBrush = new SolidColorBrush(Colors.Yellow);
+                    _currentMenuButtons[i].BorderThickness = new Thickness(3);
+                }
+                else
+                {
+                    // Normal state
+                    _currentMenuButtons[i].Background = new SolidColorBrush(Color.FromArgb(255, 26, 26, 62));
+                    _currentMenuButtons[i].BorderBrush = new SolidColorBrush(Color.FromArgb(255, 65, 105, 225));
+                    _currentMenuButtons[i].BorderThickness = new Thickness(2);
+                }
+            }
         }
 
         private void AttackButton_Click(object sender, RoutedEventArgs e)
@@ -521,6 +483,7 @@ namespace GORE.UI
 
             // Clear previous target buttons
             TargetButtonPanel.Children.Clear();
+            _currentMenuButtons.Clear();
 
             // Add target buttons for alive enemies
             int index = 0;
@@ -528,7 +491,7 @@ namespace GORE.UI
             {
                 var button = new Button
                 {
-                    Content = $"▶ {enemy.Name}",
+                    Content = $"{index + 1}. {enemy.Name}",
                     HorizontalAlignment = HorizontalAlignment.Stretch,
                     Height = 45,
                     FontSize = 18,
@@ -542,7 +505,42 @@ namespace GORE.UI
                 };
                 button.Click += TargetButton_Click;
                 TargetButtonPanel.Children.Add(button);
+                _currentMenuButtons.Add(button);
                 index++;
+            }
+
+            // Setup keyboard navigation for target selection
+            _selectedTargetIndex = 0;
+            if (_currentMenuButtons.Count > 0)
+            {
+                UpdateTargetHighlight();
+            }
+        }
+
+        private void UpdateTargetHighlight()
+        {
+            for (int i = 0; i < _currentMenuButtons.Count; i++)
+            {
+                if (i == _selectedTargetIndex)
+                {
+                    // Highlight selected with arrow
+                    var enemy = _currentMenuButtons[i].Tag as Enemy;
+                    _currentMenuButtons[i].Content = $"▶ {i + 1}. {enemy?.Name}";
+                    _currentMenuButtons[i].Background = new SolidColorBrush(Color.FromArgb(255, 65, 105, 225));
+                    _currentMenuButtons[i].BorderBrush = new SolidColorBrush(Colors.Yellow);
+                    _currentMenuButtons[i].BorderThickness = new Thickness(3);
+                    _currentMenuButtons[i].Foreground = new SolidColorBrush(Colors.Yellow);
+                }
+                else
+                {
+                    // Normal state
+                    var enemy = _currentMenuButtons[i].Tag as Enemy;
+                    _currentMenuButtons[i].Content = $"{i + 1}. {enemy?.Name}";
+                    _currentMenuButtons[i].Background = new SolidColorBrush(Color.FromArgb(255, 26, 26, 62));
+                    _currentMenuButtons[i].BorderBrush = new SolidColorBrush(Color.FromArgb(255, 65, 105, 225));
+                    _currentMenuButtons[i].BorderThickness = new Thickness(2);
+                    _currentMenuButtons[i].Foreground = new SolidColorBrush(Colors.White);
+                }
             }
         }
 
@@ -602,7 +600,7 @@ namespace GORE.UI
 
         private void UpdateDisplay()
         {
-            // Update enemy cards
+            // Update enemy cards (no HP bars in classic FF!)
             foreach (var card in EnemyPanel.Children.OfType<Border>())
             {
                 var enemy = card.Tag as Enemy;
@@ -611,28 +609,6 @@ namespace GORE.UI
                     var mainStack = card.Child as StackPanel;
                     if (mainStack != null)
                     {
-                        // Update HP bar
-                        var hpContainer = mainStack.Children.OfType<StackPanel>().LastOrDefault();
-                        if (hpContainer != null)
-                        {
-                            var hpGrid = hpContainer.Children.OfType<Grid>().FirstOrDefault();
-                            if (hpGrid != null)
-                            {
-                                var hpBar = hpGrid.Children.OfType<Border>().FirstOrDefault(b => b.Tag?.ToString() == "hpbar");
-                                if (hpBar != null)
-                                {
-                                    UpdateEnemyHPBar(hpBar, enemy);
-                                }
-                            }
-
-                            // Update HP text
-                            var hpText = hpContainer.Children.OfType<TextBlock>().FirstOrDefault(t => t.Tag?.ToString() == "hptext");
-                            if (hpText != null)
-                            {
-                                hpText.Text = $"{enemy.CurrentHP}/{enemy.MaxHP}";
-                            }
-                        }
-
                         // Fade out defeated enemies
                         if (!enemy.IsAlive)
                         {
@@ -640,8 +616,12 @@ namespace GORE.UI
 
                             // Add defeated overlay
                             var sprite = mainStack.Children.OfType<Border>().FirstOrDefault();
-                            if (sprite != null && sprite.Child == null)
+                            if (sprite != null)
                             {
+                                // Clear existing content
+                                sprite.Child = null;
+                                sprite.Background = new SolidColorBrush(Color.FromArgb(100, 40, 0, 0));
+
                                 var defeatedText = new TextBlock
                                 {
                                     Text = "✕",
@@ -650,9 +630,7 @@ namespace GORE.UI
                                     HorizontalAlignment = HorizontalAlignment.Center,
                                     VerticalAlignment = VerticalAlignment.Center
                                 };
-                                var grid = new Grid();
-                                grid.Children.Add(defeatedText);
-                                sprite.Child = grid;
+                                sprite.Child = defeatedText;
                             }
                         }
                     }
@@ -799,12 +777,86 @@ namespace GORE.UI
                     Close();
                 }
             }
-            else if (e.Key == Windows.System.VirtualKey.Escape && _selectingTarget)
+            else if (_selectingTarget)
             {
-                _selectingTarget = false;
-                TargetSelection.Visibility = Visibility.Collapsed;
-                BattleLogScroll.Visibility = Visibility.Visible;
-                ActionMenu.Visibility = Visibility.Visible;
+                // Target selection navigation
+                if (e.Key == Windows.System.VirtualKey.Up)
+                {
+                    _selectedTargetIndex--;
+                    if (_selectedTargetIndex < 0)
+                        _selectedTargetIndex = _currentMenuButtons.Count - 1;
+                    UpdateTargetHighlight();
+                    e.Handled = true;
+                }
+                else if (e.Key == Windows.System.VirtualKey.Down)
+                {
+                    _selectedTargetIndex++;
+                    if (_selectedTargetIndex >= _currentMenuButtons.Count)
+                        _selectedTargetIndex = 0;
+                    UpdateTargetHighlight();
+                    e.Handled = true;
+                }
+                else if (e.Key == Windows.System.VirtualKey.Enter || e.Key == Windows.System.VirtualKey.Space)
+                {
+                    // Confirm target selection
+                    if (_selectedTargetIndex >= 0 && _selectedTargetIndex < _currentMenuButtons.Count)
+                    {
+                        var selectedButton = _currentMenuButtons[_selectedTargetIndex];
+                        TargetButton_Click(selectedButton, null);
+                    }
+                    e.Handled = true;
+                }
+                else if (e.Key == Windows.System.VirtualKey.Escape || e.Key == Windows.System.VirtualKey.X)
+                {
+                    // Cancel target selection
+                    _selectingTarget = false;
+                    TargetSelection.Visibility = Visibility.Collapsed;
+                    BattleLogScroll.Visibility = Visibility.Visible;
+                    ActionMenu.Visibility = Visibility.Visible;
+                    _selectedMenuIndex = 0;
+                    UpdateMenuHighlight();
+                    e.Handled = true;
+                }
+                // Number keys 1-9 for quick selection
+                else if (e.Key >= Windows.System.VirtualKey.Number1 && e.Key <= Windows.System.VirtualKey.Number9)
+                {
+                    int targetIndex = (int)e.Key - (int)Windows.System.VirtualKey.Number1;
+                    if (targetIndex < _currentMenuButtons.Count)
+                    {
+                        var selectedButton = _currentMenuButtons[targetIndex];
+                        TargetButton_Click(selectedButton, null);
+                    }
+                    e.Handled = true;
+                }
+            }
+            else if (ActionMenu.Visibility == Visibility.Visible && !_battleEnded)
+            {
+                // Action menu navigation
+                if (e.Key == Windows.System.VirtualKey.Up)
+                {
+                    _selectedMenuIndex--;
+                    if (_selectedMenuIndex < 0)
+                        _selectedMenuIndex = _currentMenuButtons.Count - 1;
+                    UpdateMenuHighlight();
+                    e.Handled = true;
+                }
+                else if (e.Key == Windows.System.VirtualKey.Down)
+                {
+                    _selectedMenuIndex++;
+                    if (_selectedMenuIndex >= _currentMenuButtons.Count)
+                        _selectedMenuIndex = 0;
+                    UpdateMenuHighlight();
+                    e.Handled = true;
+                }
+                else if (e.Key == Windows.System.VirtualKey.Enter || e.Key == Windows.System.VirtualKey.Space)
+                {
+                    // Confirm menu selection
+                    if (_selectedMenuIndex == 0) // Attack
+                    {
+                        AttackButton_Click(null, null);
+                    }
+                    e.Handled = true;
+                }
             }
         }
     }
