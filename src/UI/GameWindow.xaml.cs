@@ -27,49 +27,45 @@ namespace GORE.UI
         public GameWindow()
         {
             InitializeComponent();
-            InitializeGame();
+            _ = InitializeGameAsync();
         }
 
-        private void InitializeGame()
+        private async System.Threading.Tasks.Task InitializeGameAsync()
         {
             ExtendsContentIntoTitleBar = true;
             ScreenHelper.EnterFullScreenMode(this);
 
-            // Create a simple map (1 = wall, 0 = empty)
-            int[,] worldMap = new int[,]
+            // Load map from file
+            var baseDirectory = AppContext.BaseDirectory;
+            var mapPath = System.IO.Path.Combine(baseDirectory, "gt1", "maps", "level1.map");
+            var textureCfgPath = System.IO.Path.Combine(baseDirectory, "gt1", "maps", "textures.cfg");
+
+            MapData mapData;
+            try
             {
-                {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
-                {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-                {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-                {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-                {1,0,0,0,0,0,2,2,2,2,2,0,0,0,0,3,0,3,0,3,0,0,0,1},
-                {1,0,0,0,0,0,2,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,1},
-                {1,0,0,0,0,0,2,0,0,0,2,0,0,0,0,3,0,0,0,3,0,0,0,1},
-                {1,0,0,0,0,0,2,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,1},
-                {1,0,0,0,0,0,2,2,0,2,2,0,0,0,0,3,0,3,0,3,0,0,0,1},
-                {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-                {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-                {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-                {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-                {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-                {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-                {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-                {1,4,4,4,4,4,4,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-                {1,4,0,4,0,0,0,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-                {1,4,0,0,0,0,5,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-                {1,4,0,4,0,0,0,0,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-                {1,4,0,4,4,4,4,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-                {1,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-                {1,4,4,4,4,4,4,4,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
-                {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1}
-            };
+                mapData = await MapLoader.LoadMapAsync(mapPath, textureCfgPath);
+                System.Diagnostics.Debug.WriteLine("✓ Map loaded successfully");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"✗ Failed to load map: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine("Using default map");
+                mapData = MapLoader.CreateDefaultMap();
+            }
 
             // Initialize raycasting engine
-            _raycastEngine = new RaycastEngine(worldMap);
-            _raycastEngine.PlayerPosition = new Vector2(2.5f, 2.5f);
+            _raycastEngine = new RaycastEngine(mapData.Grid);
+            _raycastEngine.PlayerPosition = mapData.PlayerStart;
 
-            // Initialize renderer (using window size)
+            // Initialize renderer
             _renderer = new Renderer3D(800, 600, _raycastEngine);
+
+            // Load textures
+            foreach (var texMapping in mapData.TextureMapping)
+            {
+                await _renderer.LoadTextureAsync(texMapping.Key, texMapping.Value);
+            }
+
             ViewportImage.Source = _renderer.GetBitmap();
 
             // Setup game loop

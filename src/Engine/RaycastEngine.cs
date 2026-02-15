@@ -105,6 +105,14 @@ namespace GORE.Engine
             else
                 perpWallDist = (mapY - PlayerPosition.Y + (1 - stepY) / 2) / rayDir.Y;
 
+            // Calculate exact wall hit position for texture mapping
+            float wallX;
+            if (side == 0)
+                wallX = PlayerPosition.Y + perpWallDist * rayDir.Y;
+            else
+                wallX = PlayerPosition.X + perpWallDist * rayDir.X;
+            wallX -= MathF.Floor(wallX);
+
             return new RaycastHit
             {
                 Distance = perpWallDist,
@@ -112,7 +120,10 @@ namespace GORE.Engine
                 MapX = mapX,
                 MapY = mapY,
                 WallType = (mapX >= 0 && mapX < _mapWidth && mapY >= 0 && mapY < _mapHeight) 
-                    ? _worldMap[mapY, mapX] : 0
+                    ? _worldMap[mapY, mapX] : 0,
+                WallX = wallX,
+                RayDirX = rayDir.X,
+                RayDirY = rayDir.Y
             };
         }
 
@@ -159,5 +170,8 @@ namespace GORE.Engine
         public int MapX;
         public int MapY;
         public int WallType;
+        public float WallX;
+        public float RayDirX;
+        public float RayDirY;
     }
 }
