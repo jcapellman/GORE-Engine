@@ -414,6 +414,11 @@ namespace GORE.GameEngine
             return mapData[x, y];
         }
 
+        public Vector2 GetPlayerPosition()
+        {
+            return PlayerPosition;
+        }
+
         private void DrawWaterTile(CanvasDrawingSession drawSession, CanvasBitmap texture, float x, float y, TileEffect effect)
         {
             // Simple scrolling water effect

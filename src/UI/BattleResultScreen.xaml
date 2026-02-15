@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="GORE.UI.BattleResultScreen"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Title="Battle Results">
+
+    <Grid x:Name="RootGrid" Background="#1a0033" KeyDown="RootGrid_KeyDown" Loaded="RootGrid_Loaded">
+        <Border Background="#000000cc" 
+                MaxWidth="800" 
+                MaxHeight="600"
+                BorderBrush="Gold" 
+                BorderThickness="4"
+                CornerRadius="12"
+                Padding="40"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center">
+            
+            <StackPanel Spacing="20">
+                <!-- Title -->
+                <TextBlock Text="VICTORY!" 
+                          FontSize="48" 
+                          FontWeight="Bold" 
+                          Foreground="Gold"
+                          HorizontalAlignment="Center"
+                          Margin="0,0,0,20"/>
+
+                <!-- Defeated Enemies -->
+                <Border Background="#00000066" 
+                       Padding="15" 
+                       CornerRadius="8"
+                       BorderBrush="White" 
+                       BorderThickness="1">
+                    <StackPanel>
+                        <TextBlock Text="Defeated:" 
+                                  FontSize="20" 
+                                  FontWeight="Bold" 
+                                  Foreground="White"
+                                  Margin="0,0,0,10"/>
+                        <TextBlock x:Name="DefeatedEnemiesText" 
+                                  FontSize="18" 
+                                  Foreground="LightGray"
+                                  TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Rewards -->
+                <Border Background="#00000066" 
+                       Padding="15" 
+                       CornerRadius="8"
+                       BorderBrush="Gold" 
+                       BorderThickness="2">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Rewards:" 
+                                  FontSize="20" 
+                                  FontWeight="Bold" 
+                                  Foreground="Gold"
+                                  Margin="0,0,0,5"/>
+                        
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <TextBlock Text="💰" FontSize="24"/>
+                            <TextBlock x:Name="GoldText" 
+                                      FontSize="22" 
+                                      FontWeight="Bold" 
+                                      Foreground="Yellow"/>
+                        </StackPanel>
+                        
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <TextBlock Text="⭐" FontSize="24"/>
+                            <TextBlock x:Name="ExpText" 
+                                      FontSize="22" 
+                                      FontWeight="Bold" 
+                                      Foreground="Cyan"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Character Experience -->
+                <Border Background="#00000066" 
+                       Padding="15" 
+                       CornerRadius="8"
+                       BorderBrush="Cyan" 
+                       BorderThickness="1">
+                    <StackPanel x:Name="CharacterExpPanel" Spacing="8">
+                        <TextBlock Text="Experience Gained:" 
+                                  FontSize="20" 
+                                  FontWeight="Bold" 
+                                  Foreground="Cyan"
+                                  Margin="0,0,0,5"/>
+                        <!-- Character exp details added dynamically -->
+                    </StackPanel>
+                </Border>
+
+                <!-- Level Ups -->
+                <StackPanel x:Name="LevelUpPanel" 
+                           Spacing="10" 
+                           Visibility="Collapsed">
+                    <Border Background="#00000066" 
+                           Padding="15" 
+                           CornerRadius="8"
+                           BorderBrush="Lime" 
+                           BorderThickness="2">
+                        <StackPanel Spacing="5">
+                            <TextBlock Text="★ LEVEL UP! ★" 
+                                      FontSize="24" 
+                                      FontWeight="Bold" 
+                                      Foreground="Lime"
+                                      HorizontalAlignment="Center"
+                                      Margin="0,0,0,10"/>
+                            <ItemsControl x:Name="LevelUpsList">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding}" 
+                                                  FontSize="18" 
+                                                  Foreground="LightGreen"
+                                                  Margin="0,2"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- Continue Prompt -->
+                <TextBlock Text="Press ENTER to continue..." 
+                          FontSize="18" 
+                          Foreground="Yellow"
+                          HorizontalAlignment="Center"
+                          Margin="0,20,0,0"
+                          FontStyle="Italic"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

@@ -1,0 +1,30 @@
+[
+  {
+    "id": 1,
+    "name": "Disciple",
+    "level": 1,
+    "maxHP": 30,
+    "attack": 12,
+    "defense": 5,
+    "magic": 0,
+    "speed": 8,
+    "expReward": 25,
+    "goldReward": 15,
+    "texture": "Assets/Enemies/disciple.png",
+    "encounterZones": [1, 2]
+  },
+  {
+    "id": 2,
+    "name": "Minion",
+    "level": 1,
+    "maxHP": 20,
+    "attack": 8,
+    "defense": 3,
+    "magic": 0,
+    "speed": 5,
+    "expReward": 15,
+    "goldReward": 10,
+    "texture": "Assets/Enemies/minion.png",
+    "encounterZones": [1]
+  }
+]

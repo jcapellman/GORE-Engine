@@ -7,7 +7,6 @@
     <UseWinUI>true</UseWinUI>
     <EnableMsixTooling>true</EnableMsixTooling>
   </PropertyGroup>
-
   <ItemGroup>
     <Content Include="Assets\LogoAlt1.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -37,6 +36,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="UI\BattleResultScreen.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </None>
+    <None Update="UI\BattleScreen.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </None>
     <None Update="UI\MainMenuScreen.xaml">
       <Generator>MSBuild:Compile</Generator>
     </None>

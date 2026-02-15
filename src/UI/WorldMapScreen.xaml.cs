@@ -8,6 +8,7 @@ using Microsoft.UI.Xaml.Input;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Numerics;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -23,7 +24,9 @@ namespace GORE.UI
         private WorldMap worldMap;
         private List<WorldMapTerrain> terrainTypes;
         private Character player;
+        private List<Character> party;
         private DispatcherQueueTimer gameLoopTimer;
+        private Random random = new Random();
 
         private bool pendingMoveUp;
         private bool pendingMoveDown;
@@ -39,9 +42,19 @@ namespace GORE.UI
             _mainWindow = mainWindow;
             player = playerCharacter;
 
+            // Create a party (for now just the player, can expand later)
+            party = new List<Character> { playerCharacter };
+
+            // Add two more party members for demo
+            var warrior = new Character("Warrior") { Level = 1, MaxHP = 80, CurrentHP = 80, Attack = 15, Defense = 12, MaxMP = 10, CurrentMP = 10 };
+            var mage = new Character("Mage") { Level = 1, MaxHP = 50, CurrentHP = 50, Attack = 8, Defense = 5, Magic = 20, MaxMP = 50, CurrentMP = 50 };
+            party.Add(warrior);
+            party.Add(mage);
+
             ExtendsContentIntoTitleBar = true;
             ScreenHelper.EnterFullScreenMode(this);
 
+            _ = LoadEnemyDataAsync();
             _ = LoadWorldMapAsync();
             _ = LoadTerrainTypesAsync();
 
@@ -163,6 +176,39 @@ namespace GORE.UI
             }
         }
 
+        private async Task LoadEnemyDataAsync()
+        {
+            try
+            {
+                var baseDirectory = AppContext.BaseDirectory;
+                var enemyPath = Path.Combine(baseDirectory, "Assets", "Data", "Enemies.json");
+
+                System.Diagnostics.Debug.WriteLine($"=== LOADING ENEMY DATA ===");
+                System.Diagnostics.Debug.WriteLine($"Enemy Path: {enemyPath}");
+
+                if (File.Exists(enemyPath))
+                {
+                    var json = await File.ReadAllTextAsync(enemyPath);
+                    var options = new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    };
+                    var enemies = JsonSerializer.Deserialize<List<EnemyData>>(json, options);
+                    EnemyDatabase.Load(enemies);
+
+                    System.Diagnostics.Debug.WriteLine($"✓ Loaded {enemies?.Count ?? 0} enemy types");
+                }
+                else
+                {
+                    System.Diagnostics.Debug.WriteLine($"✗ Enemies.json not found at: {enemyPath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"✗ Error loading enemy data: {ex.Message}");
+            }
+        }
+
         private void CreateDefaultWorldMap()
         {
             throw new InvalidOperationException(
@@ -224,15 +270,53 @@ namespace GORE.UI
 
         private void CheckForEncounter()
         {
-            if (steps % 30 == 0)
+            if (tileMapRenderer == null || terrainTypes == null) return;
+
+            // Get current terrain
+            var playerPos = tileMapRenderer.GetPlayerPosition();
+            int terrainId = tileMapRenderer.GetTerrainAt((int)playerPos.X, (int)playerPos.Y);
+            var terrain = terrainTypes.FirstOrDefault(t => t.Id == terrainId);
+
+            if (terrain == null || terrain.EncounterRate == 0) return;
+
+            // Check for random encounter
+            if (random.Next(100) < terrain.EncounterRate)
             {
-                var random = new Random();
-                if (random.Next(100) < 10)
-                {
-                    gameLoopTimer?.Stop();
-                    System.Diagnostics.Debug.WriteLine("Battle encounter!");
-                }
+                System.Diagnostics.Debug.WriteLine($"Battle encounter on {terrain.Name}!");
+                TriggerBattle(terrain.EncounterZone);
             }
+        }
+
+        private void TriggerBattle(int encounterZone)
+        {
+            gameLoopTimer?.Stop();
+
+            // Get possible enemies for this zone
+            var possibleEnemies = EnemyDatabase.GetEnemiesForZone(encounterZone);
+            if (possibleEnemies.Count == 0)
+            {
+                System.Diagnostics.Debug.WriteLine("No enemies for this zone!");
+                gameLoopTimer?.Start();
+                return;
+            }
+
+            // Create 1-3 random enemies
+            int enemyCount = random.Next(1, 4);
+            var enemies = new List<Enemy>();
+
+            for (int i = 0; i < enemyCount; i++)
+            {
+                var enemyData = possibleEnemies[random.Next(possibleEnemies.Count)];
+                var enemy = EnemyDatabase.CreateEnemyInstance(enemyData);
+                enemies.Add(enemy);
+            }
+
+            System.Diagnostics.Debug.WriteLine($"Starting battle with {enemies.Count} enemies: {string.Join(", ", enemies.Select(e => e.Name))}");
+
+            // Open battle screen
+            var battleScreen = new BattleScreen(_mainWindow, party, enemies);
+            battleScreen.Activate();
+            Close();
         }
 
         private void UpdateLocationDisplay()

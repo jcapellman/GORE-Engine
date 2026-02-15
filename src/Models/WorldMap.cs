@@ -38,6 +38,7 @@ namespace GORE.Models
         public string Texture { get; set; }
         public bool IsWalkable { get; set; }
         public int EncounterRate { get; set; }
+        public int EncounterZone { get; set; }
         public TileEffect Effect { get; set; }
     }
 

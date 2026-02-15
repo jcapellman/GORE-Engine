@@ -5,12 +5,16 @@ namespace GORE.Models
     public class Enemy
     {
         public string Name { get; set; }
+        public int Level { get; set; }
         public int MaxHP { get; set; }
         public int CurrentHP { get; set; }
         public int Attack { get; set; }
         public int Defense { get; set; }
+        public int Magic { get; set; }
+        public int Speed { get; set; }
         public int ExpReward { get; set; }
         public int GoldReward { get; set; }
+        public string Texture { get; set; }
 
         public bool IsAlive => CurrentHP > 0;
 
