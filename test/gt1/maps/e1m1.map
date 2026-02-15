@@ -1,10 +1,18 @@
-# GORE Wolf3D Map Format
-# 0 = empty space
-# 1-9 = wall with texture ID
+# GORE Wolf3D Map Format v2.0
+[Metadata]
+Name=Hangar
+Width=24
+Height=24
+PlayerStartX=2.5
+PlayerStartY=2.5
 
-# Map dimensions: 24x24
-# Player start: 2.5, 2.5
+[Textures]
+1=gt1/textures/amberrock.jpg
+2=gt1/textures/amberstone.jpg
+3=gt1/textures/lightstone.jpg
+4=gt1/textures/yellowrock.jpg
 
+[Grid]
 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
 1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
 1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1
