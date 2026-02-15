@@ -14,10 +14,6 @@ namespace GORE.Engine
         private static bool _initialized = false;
         private static Window _mainWindow;
 
-        // Win32 API for cursor visibility
-        [DllImport("user32.dll")]
-        private static extern int ShowCursor(bool bShow);
-
         /// <summary>
         /// Initialize and start the GORE Engine with splash screen.
         /// Call this from your App.xaml.cs OnLaunched method.
@@ -28,9 +24,6 @@ namespace GORE.Engine
             if (_initialized) return;
 
             _mainWindow = mainWindow;
-
-            // Hide the mouse cursor
-            HideCursor();
 
             // Load game configuration
             var config = await Services.ConfigurationService.LoadConfigurationAsync();
@@ -70,22 +63,6 @@ namespace GORE.Engine
                 presenter.IsMaximizable = false;
                 presenter.IsMinimizable = false;
             }
-        }
-
-        private static void HideCursor()
-        {
-            // Hide the cursor using Win32 API
-            ShowCursor(false);
-            System.Diagnostics.Debug.WriteLine("Cursor hidden");
-        }
-
-        /// <summary>
-        /// Shows the mouse cursor (called on app exit)
-        /// </summary>
-        public static void ShowCursor()
-        {
-            ShowCursor(true);
-            System.Diagnostics.Debug.WriteLine("Cursor shown");
         }
 
         /// <summary>

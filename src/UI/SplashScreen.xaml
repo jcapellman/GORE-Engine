@@ -8,7 +8,7 @@
     mc:Ignorable="d">
 
     <Grid Background="Black">
-        <canvas:CanvasControl 
+        <canvas:CanvasControl
             x:Name="CanvasControl"
             Draw="CanvasControl_Draw"
             ClearColor="Black"
