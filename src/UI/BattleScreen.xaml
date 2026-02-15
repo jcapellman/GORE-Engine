@@ -39,28 +39,66 @@
                 </StackPanel>
             </Grid>
 
-            <!-- Battle UI (Bottom Section) -->
+            <!-- Battle UI (Bottom Section) - FF6 Style -->
             <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="1*"/>
                     <ColumnDefinition Width="2*"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Left Side: Command Menu -->
+                <!-- Left Box: Active Character & Command Menu (FF6 Style) -->
                 <Border Grid.Column="0" 
-                       Background="#000000ee" 
-                       BorderBrush="#4169E1" 
-                       BorderThickness="2"
-                       Margin="10">
+                       Margin="10"
+                       CornerRadius="8"
+                       BorderBrush="#6495ED"
+                       BorderThickness="3">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                            <GradientStop Color="#2B3A8F" Offset="0"/>
+                            <GradientStop Color="#1C2670" Offset="0.5"/>
+                            <GradientStop Color="#0F1338" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
+
                     <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Active Character Display -->
+                        <Border Grid.Row="0" 
+                               Background="#00000044"
+                               Margin="10,10,10,5"
+                               Padding="10"
+                               CornerRadius="4">
+                            <StackPanel>
+                                <TextBlock x:Name="ActiveCharacterName"
+                                          Text="Terra"
+                                          FontFamily="Consolas"
+                                          FontSize="22"
+                                          FontWeight="Bold"
+                                          Foreground="White"/>
+                                <TextBlock x:Name="ActiveCharacterLevel"
+                                          Text="8"
+                                          FontFamily="Consolas"
+                                          FontSize="36"
+                                          FontWeight="Bold"
+                                          Foreground="White"
+                                          HorizontalAlignment="Right"
+                                          Margin="0,-10,0,0"/>
+                            </StackPanel>
+                        </Border>
+
                         <!-- Action Menu -->
                         <StackPanel x:Name="ActionMenu" 
+                                   Grid.Row="1"
                                    VerticalAlignment="Center"
-                                   Margin="20"
+                                   Margin="20,0,20,20"
                                    Spacing="15"
                                    Visibility="Collapsed">
                             <Button x:Name="AttackButton" 
-                                   Content="⚔ FIGHT" 
+                                   Content="⚔ Fight" 
                                    HorizontalAlignment="Stretch"
                                    Height="45"
                                    FontSize="20"
@@ -72,7 +110,7 @@
                                    BorderBrush="#4169E1"
                                    BorderThickness="2"/>
                             <Button x:Name="MagicButton" 
-                                   Content="✦ MAGIC" 
+                                   Content="✦ Magic" 
                                    HorizontalAlignment="Stretch"
                                    Height="45"
                                    FontSize="20"
@@ -84,7 +122,7 @@
                                    BorderBrush="#333333"
                                    BorderThickness="2"/>
                             <Button x:Name="ItemButton" 
-                                   Content="⚗ ITEM" 
+                                   Content="⚗ Item" 
                                    HorizontalAlignment="Stretch"
                                    Height="45"
                                    FontSize="20"
@@ -99,6 +137,7 @@
 
                         <!-- Status Text -->
                         <TextBlock x:Name="StatusText" 
+                                  Grid.Row="1"
                                   Text="Press ENTER to continue..." 
                                   Foreground="Yellow" 
                                   FontSize="18"
@@ -112,45 +151,64 @@
                     </Grid>
                 </Border>
 
-                <!-- Right Side: Battle Log & Target Selection -->
+                <!-- Right Box: Party Status List (FF6 Style) -->
                 <Border Grid.Column="1" 
-                       Background="#000000ee" 
-                       BorderBrush="#4169E1" 
-                       BorderThickness="2"
-                       Margin="10">
+                       Margin="10"
+                       CornerRadius="8"
+                       BorderBrush="#6495ED"
+                       BorderThickness="3">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                            <GradientStop Color="#2B3A8F" Offset="0"/>
+                            <GradientStop Color="#1C2670" Offset="0.5"/>
+                            <GradientStop Color="#0F1338" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
+
                     <Grid>
-                        <!-- Battle Log -->
-                        <ScrollViewer x:Name="BattleLogScroll" 
+                        <!-- Party Status (Always Visible) -->
+                        <StackPanel x:Name="PartyStatusList"
+                                   Margin="15"
+                                   Spacing="8">
+                            <!-- Party member rows added dynamically -->
+                        </StackPanel>
+
+                        <!-- Target Selection Overlay -->
+                        <Grid x:Name="TargetSelection" 
+                             Background="#000000ee"
+                             Visibility="Collapsed">
+                            <StackPanel VerticalAlignment="Center"
+                                       HorizontalAlignment="Center"
+                                       Margin="20"
+                                       Spacing="10">
+                                <TextBlock Text="▶ SELECT TARGET" 
+                                          Foreground="#FFD700" 
+                                          FontSize="22" 
+                                          FontWeight="Bold"
+                                          FontFamily="Consolas"
+                                          HorizontalAlignment="Center"
+                                          Margin="0,0,0,15"/>
+                                <StackPanel x:Name="TargetButtonPanel" 
+                                           Spacing="10">
+                                    <!-- Target buttons added dynamically -->
+                                </StackPanel>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Battle Log Overlay -->
+                        <ScrollViewer x:Name="BattleLogScroll"
+                                     Background="#000000cc"
                                      Margin="15"
-                                     VerticalScrollBarVisibility="Auto">
+                                     VerticalScrollBarVisibility="Auto"
+                                     Visibility="Collapsed">
                             <TextBlock x:Name="BattleLogText" 
                                       TextWrapping="Wrap" 
                                       FontFamily="Consolas" 
                                       FontSize="16" 
                                       Foreground="White"
-                                      LineHeight="22"/>
+                                      LineHeight="22"
+                                      Padding="10"/>
                         </ScrollViewer>
-
-                        <!-- Target Selection -->
-                        <StackPanel x:Name="TargetSelection" 
-                                   Orientation="Vertical" 
-                                   VerticalAlignment="Center"
-                                   HorizontalAlignment="Center"
-                                   Margin="20"
-                                   Spacing="10"
-                                   Visibility="Collapsed">
-                            <TextBlock Text="▶ SELECT TARGET" 
-                                      Foreground="#FFD700" 
-                                      FontSize="22" 
-                                      FontWeight="Bold"
-                                      FontFamily="Consolas"
-                                      HorizontalAlignment="Center"
-                                      Margin="0,0,0,15"/>
-                            <StackPanel x:Name="TargetButtonPanel" 
-                                       Spacing="10">
-                                <!-- Target buttons will be added dynamically -->
-                            </StackPanel>
-                        </StackPanel>
                     </Grid>
                 </Border>
             </Grid>

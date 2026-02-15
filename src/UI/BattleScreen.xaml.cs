@@ -71,12 +71,15 @@ namespace GORE.UI
                 EnemyPanel.Children.Add(enemyCard);
             }
 
-            // Setup party display
+            // Setup party display (battlefield sprites)
             foreach (var character in _party)
             {
                 var charCard = CreateCharacterCard(character);
                 PartyPanel.Children.Add(charCard);
             }
+
+            // Setup party status list (bottom right box - FF6 style)
+            SetupPartyStatusList();
 
             // Add initial battle text
             await AddBattleText("Battle Start!");
@@ -85,6 +88,66 @@ namespace GORE.UI
             await Task.Delay(1000);
 
             StartPlayerTurn();
+        }
+
+        private void SetupPartyStatusList()
+        {
+            PartyStatusList.Children.Clear();
+
+            foreach (var character in _party)
+            {
+                var statusRow = new Grid
+                {
+                    Margin = new Thickness(0, 4, 0, 4),
+                    Tag = character
+                };
+
+                statusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });
+                statusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                statusRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
+
+                // Character name
+                var nameText = new TextBlock
+                {
+                    Text = character.Name,
+                    Foreground = new SolidColorBrush(Colors.White),
+                    FontSize = 18,
+                    FontFamily = new FontFamily("Consolas"),
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                Grid.SetColumn(nameText, 0);
+                statusRow.Children.Add(nameText);
+
+                // HP display
+                var hpText = new TextBlock
+                {
+                    Text = $"{character.CurrentHP,3}/ {character.MaxHP,3}",
+                    Foreground = new SolidColorBrush(Colors.White),
+                    FontSize = 16,
+                    FontFamily = new FontFamily("Consolas"),
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Tag = "hp"
+                };
+                Grid.SetColumn(hpText, 1);
+                statusRow.Children.Add(hpText);
+
+                // Action display
+                var actionText = new TextBlock
+                {
+                    Text = "Ready",
+                    Foreground = new SolidColorBrush(Colors.LightGray),
+                    FontSize = 16,
+                    FontFamily = new FontFamily("Consolas"),
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Tag = "action"
+                };
+                Grid.SetColumn(actionText, 2);
+                statusRow.Children.Add(actionText);
+
+                PartyStatusList.Children.Add(statusRow);
+            }
         }
 
         private async Task LoadBattleBackgroundAsync(string backgroundPath)
@@ -141,19 +204,17 @@ namespace GORE.UI
         {
             var mainStack = new StackPanel
             {
-                Spacing = 8
+                Spacing = 4,
+                HorizontalAlignment = HorizontalAlignment.Center
             };
 
-            // Enemy sprite
+            // Enemy sprite (no HP bar to avoid clipping)
             var sprite = new Border
             {
                 Width = 120,
                 Height = 120,
-                Background = new SolidColorBrush(Color.FromArgb(100, 80, 0, 0)),
-                BorderBrush = new SolidColorBrush(Colors.DarkRed),
-                BorderThickness = new Thickness(2),
-                CornerRadius = new CornerRadius(4),
-                Tag = enemy
+                Background = new SolidColorBrush(Color.FromArgb(0, 0, 0, 0)), // Transparent
+                Tag = "sprite"
             };
 
             // Try to load enemy texture
@@ -176,21 +237,14 @@ namespace GORE.UI
 
             mainStack.Children.Add(sprite);
 
-            // Enemy name
-            var nameText = new TextBlock
+            // Container for damage text overlays
+            var damageTextContainer = new Canvas
             {
-                Text = enemy.Name,
-                Foreground = new SolidColorBrush(Colors.White),
-                FontSize = 18,
-                FontWeight = Microsoft.UI.Text.FontWeights.Bold,
-                FontFamily = new FontFamily("Consolas"),
-                HorizontalAlignment = HorizontalAlignment.Center,
-                Tag = "name"
+                Width = 120,
+                Height = 40,
+                Tag = "damageContainer"
             };
-            mainStack.Children.Add(nameText);
-
-            // NO HP BAR - just like Final Fantasy!
-            // You never see enemy HP in classic FF
+            mainStack.Children.Add(damageTextContainer);
 
             var wrapper = new Border
             {
@@ -437,10 +491,15 @@ namespace GORE.UI
 
             _ = AddBattleText($"\n{currentChar.Name}'s turn!");
 
+            // Update active character display (left box)
+            ActiveCharacterName.Text = currentChar.Name;
+            ActiveCharacterLevel.Text = currentChar.Level.ToString();
+
+            // Show action menu, hide target selection and battle log
             ActionMenu.Visibility = Visibility.Visible;
             TargetSelection.Visibility = Visibility.Collapsed;
             StatusText.Visibility = Visibility.Collapsed;
-            BattleLogScroll.Visibility = Visibility.Visible;
+            BattleLogScroll.Visibility = Visibility.Collapsed;
 
             // Setup keyboard navigation for action menu
             _selectedMenuIndex = 0;
@@ -479,6 +538,7 @@ namespace GORE.UI
             ActionMenu.Visibility = Visibility.Collapsed;
             TargetSelection.Visibility = Visibility.Visible;
             BattleLogScroll.Visibility = Visibility.Collapsed;
+            PartyStatusList.Visibility = Visibility.Collapsed; // Hide party status during targeting
             _selectingTarget = true;
 
             // Clear previous target buttons
@@ -552,14 +612,25 @@ namespace GORE.UI
 
             _selectingTarget = false;
             TargetSelection.Visibility = Visibility.Collapsed;
-            BattleLogScroll.Visibility = Visibility.Visible;
+            BattleLogScroll.Visibility = Visibility.Visible; // Show battle log during attack
+            PartyStatusList.Visibility = Visibility.Collapsed; // Keep party status hidden during action
 
             var attacker = _party.Where(c => c.IsAlive).FirstOrDefault();
             if (attacker != null)
             {
+                // Calculate damage before showing
+                int damage = attacker.CalculateDamage(target.Defense);
+                var random = new Random();
+                int variance = random.Next(-2, 3);
+                damage = Math.Max(1, damage + variance);
+
+                // Show damage text on enemy
+                await ShowDamageText(target, damage);
+
+                // Execute attack
                 string message = _battleSystem.ExecuteAttack(attacker, target);
                 await AddBattleText(message);
-                await Task.Delay(800);
+                await Task.Delay(500);
 
                 UpdateDisplay();
 
@@ -572,6 +643,63 @@ namespace GORE.UI
                 // Enemy turn
                 await ExecuteEnemyPhase();
             }
+        }
+
+        private async Task ShowDamageText(Enemy target, int damage)
+        {
+            // Find the enemy card
+            foreach (var card in EnemyPanel.Children.OfType<Border>())
+            {
+                if (card.Tag == target)
+                {
+                    var mainStack = card.Child as StackPanel;
+                    if (mainStack != null)
+                    {
+                        var damageContainer = mainStack.Children.OfType<Canvas>().FirstOrDefault(c => c.Tag?.ToString() == "damageContainer");
+                        if (damageContainer != null)
+                        {
+                            // Create damage text (FF6 style: "X HITS" or just damage number)
+                            var damageText = new TextBlock
+                            {
+                                Text = $"{damage}",
+                                FontSize = 28,
+                                FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+                                FontFamily = new FontFamily("Consolas"),
+                                Foreground = new SolidColorBrush(Colors.White),
+                                // Add shadow effect
+                                //Stroke = new SolidColorBrush(Colors.Black),
+                                //StrokeThickness = 2
+                            };
+
+                            Canvas.SetLeft(damageText, 40);
+                            Canvas.SetTop(damageText, 0);
+
+                            damageContainer.Children.Add(damageText);
+
+                            // Animate: float up and fade out
+                            await AnimateDamageText(damageText, damageContainer);
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
+        private async Task AnimateDamageText(TextBlock damageText, Canvas container)
+        {
+            // Float up and fade out over 1 second
+            for (int i = 0; i < 20; i++)
+            {
+                var currentTop = Canvas.GetTop(damageText);
+                Canvas.SetTop(damageText, currentTop - 2); // Move up
+
+                damageText.Opacity = 1.0 - (i / 20.0); // Fade out
+
+                await Task.Delay(50);
+            }
+
+            // Remove the text
+            container.Children.Remove(damageText);
         }
 
         private async Task ExecuteEnemyPhase()
@@ -598,46 +726,23 @@ namespace GORE.UI
             StartPlayerTurn();
         }
 
-        private void UpdateDisplay()
+        private async void UpdateDisplay()
         {
-            // Update enemy cards (no HP bars in classic FF!)
+            // Update enemy cards (no HP bar updates - removed to prevent clipping)
             foreach (var card in EnemyPanel.Children.OfType<Border>())
             {
                 var enemy = card.Tag as Enemy;
                 if (enemy != null)
                 {
-                    var mainStack = card.Child as StackPanel;
-                    if (mainStack != null)
+                    // Fade out defeated enemies over 2 seconds
+                    if (!enemy.IsAlive && card.Opacity > 0.3)
                     {
-                        // Fade out defeated enemies
-                        if (!enemy.IsAlive)
-                        {
-                            card.Opacity = 0.3;
-
-                            // Add defeated overlay
-                            var sprite = mainStack.Children.OfType<Border>().FirstOrDefault();
-                            if (sprite != null)
-                            {
-                                // Clear existing content
-                                sprite.Child = null;
-                                sprite.Background = new SolidColorBrush(Color.FromArgb(100, 40, 0, 0));
-
-                                var defeatedText = new TextBlock
-                                {
-                                    Text = "✕",
-                                    FontSize = 80,
-                                    Foreground = new SolidColorBrush(Colors.Red),
-                                    HorizontalAlignment = HorizontalAlignment.Center,
-                                    VerticalAlignment = VerticalAlignment.Center
-                                };
-                                sprite.Child = defeatedText;
-                            }
-                        }
+                        _ = FadeOutEnemyAsync(card);
                     }
                 }
             }
 
-            // Update party cards
+            // Update party cards (battlefield)
             foreach (var card in PartyPanel.Children.OfType<Border>())
             {
                 var character = card.Tag as Character;
@@ -705,6 +810,55 @@ namespace GORE.UI
                         card.Opacity = 0.4;
                         card.Background = new SolidColorBrush(Color.FromArgb(220, 60, 20, 20));
                     }
+                }
+            }
+
+            // Update party status list (bottom right box)
+            foreach (var statusRow in PartyStatusList.Children.OfType<Grid>())
+            {
+                var character = statusRow.Tag as Character;
+                if (character != null)
+                {
+                    var hpText = statusRow.Children.OfType<TextBlock>().FirstOrDefault(t => t.Tag?.ToString() == "hp");
+                    if (hpText != null)
+                    {
+                        hpText.Text = $"{character.CurrentHP,3}/ {character.MaxHP,3}";
+                    }
+                }
+            }
+        }
+
+        private async Task FadeOutEnemyAsync(Border enemyCard)
+        {
+            // Smooth 2-second fade animation
+            double startOpacity = enemyCard.Opacity;
+            int steps = 40; // 40 steps * 50ms = 2 seconds
+
+            for (int i = 0; i < steps; i++)
+            {
+                double progress = (double)i / steps;
+                enemyCard.Opacity = startOpacity * (1.0 - progress);
+                await Task.Delay(50);
+            }
+
+            enemyCard.Opacity = 0;
+
+            // Optionally add defeated marker
+            var mainStack = enemyCard.Child as StackPanel;
+            if (mainStack != null)
+            {
+                var sprite = mainStack.Children.OfType<Border>().FirstOrDefault(b => b.Tag?.ToString() == "sprite");
+                if (sprite != null)
+                {
+                    sprite.Child = new TextBlock
+                    {
+                        Text = "✕",
+                        FontSize = 80,
+                        Foreground = new SolidColorBrush(Colors.Red),
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Opacity = 0.7
+                    };
                 }
             }
         }
@@ -811,7 +965,8 @@ namespace GORE.UI
                     // Cancel target selection
                     _selectingTarget = false;
                     TargetSelection.Visibility = Visibility.Collapsed;
-                    BattleLogScroll.Visibility = Visibility.Visible;
+                    BattleLogScroll.Visibility = Visibility.Collapsed;
+                    PartyStatusList.Visibility = Visibility.Visible; // Restore party status
                     ActionMenu.Visibility = Visibility.Visible;
                     _selectedMenuIndex = 0;
                     UpdateMenuHighlight();
