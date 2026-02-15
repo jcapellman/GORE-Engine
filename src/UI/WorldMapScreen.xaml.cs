@@ -215,6 +215,9 @@ namespace GORE.UI
                 }
             }
 
+            // Update animations (water effects, etc.)
+            tileMapRenderer.Update(0.016f); // ~60 FPS
+
             MapCanvas.Invalidate();
             MinimapCanvas?.Invalidate(); // Update minimap for player position flash
         }

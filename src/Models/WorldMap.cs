@@ -38,5 +38,13 @@ namespace GORE.Models
         public string Texture { get; set; }
         public bool IsWalkable { get; set; }
         public int EncounterRate { get; set; }
+        public TileEffect Effect { get; set; }
+    }
+
+    public class TileEffect
+    {
+        public string Type { get; set; } // "water", "lava", "snow", etc.
+        public float Speed { get; set; } = 1.0f;
+        public float Intensity { get; set; } = 1.0f;
     }
 }

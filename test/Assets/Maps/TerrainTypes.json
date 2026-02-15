@@ -4,7 +4,12 @@
     "name": "Water",
     "texture": "Assets/Tiles/Water.png",
     "isWalkable": false,
-    "encounterRate": 0
+    "encounterRate": 0,
+    "effect": {
+      "type": "water",
+      "speed": 0.2,
+      "intensity": 1.0
+    }
   },
   {
     "id": 1,

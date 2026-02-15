@@ -31,6 +31,10 @@ namespace GORE.GameEngine
         private int[,] mapData;
         private Dictionary<int, CanvasBitmap> tileTextures = new Dictionary<int, CanvasBitmap>();
         private Dictionary<string, CanvasBitmap> locationTextures = new Dictionary<string, CanvasBitmap>();
+        private Dictionary<int, TileEffect> tileEffects = new Dictionary<int, TileEffect>();
+
+        // Animation state
+        private float waterAnimationTime = 0f;
 
         public TileMapRenderer(int screenWidth, int screenHeight, int mapWidth, int mapHeight)
         {
@@ -104,6 +108,14 @@ namespace GORE.GameEngine
                         {
                             var bitmap = await CanvasBitmap.LoadAsync(canvas, texturePath);
                             tileTextures[terrain.Id] = bitmap;
+
+                            // Store effect data if present
+                            if (terrain.Effect != null)
+                            {
+                                tileEffects[terrain.Id] = terrain.Effect;
+                                System.Diagnostics.Debug.WriteLine($"  ✓ Registered effect: {terrain.Effect.Type} (Speed: {terrain.Effect.Speed}, Intensity: {terrain.Effect.Intensity})");
+                            }
+
                             System.Diagnostics.Debug.WriteLine($"  ✓ SUCCESS: Loaded texture {bitmap.SizeInPixels.Width}x{bitmap.SizeInPixels.Height}");
                         }
                         else
@@ -187,6 +199,12 @@ namespace GORE.GameEngine
             System.Diagnostics.Debug.WriteLine($"✓ Loaded {locationTextures.Count} location textures");
         }
 
+        public void Update(float deltaTime)
+        {
+            // Update animation time
+            waterAnimationTime += deltaTime;
+        }
+
         public void Render(CanvasDrawingSession drawSession)
         {
             if (mapData == null)
@@ -227,9 +245,19 @@ namespace GORE.GameEngine
                             if (tileTextures.ContainsKey(terrainType))
                             {
                                 var texture = tileTextures[terrainType];
-                                drawSession.DrawImage(texture, 
-                                    new Windows.Foundation.Rect(screenX, screenY, tileSize, tileSize),
-                                    new Windows.Foundation.Rect(0, 0, texture.SizeInPixels.Width, texture.SizeInPixels.Height));
+
+                                // Check if this tile has a water effect
+                                if (tileEffects.ContainsKey(terrainType) && tileEffects[terrainType].Type == "water")
+                                {
+                                    var effect = tileEffects[terrainType];
+                                    DrawWaterTile(drawSession, texture, screenX, screenY, effect);
+                                }
+                                else
+                                {
+                                    drawSession.DrawImage(texture, 
+                                        new Windows.Foundation.Rect(screenX, screenY, tileSize, tileSize),
+                                        new Windows.Foundation.Rect(0, 0, texture.SizeInPixels.Width, texture.SizeInPixels.Height));
+                                }
                             }
                             else
                             {
@@ -384,6 +412,31 @@ namespace GORE.GameEngine
             if (x < 0 || x >= mapWidth || y < 0 || y >= mapHeight)
                 return -1;
             return mapData[x, y];
+        }
+
+        private void DrawWaterTile(CanvasDrawingSession drawSession, CanvasBitmap texture, float x, float y, TileEffect effect)
+        {
+            // Simple scrolling water effect
+            float speed = effect.Speed * 10f; // Adjust speed
+            float offset = (waterAnimationTime * speed) % tileSize;
+
+            // Draw the texture with a slight offset for wave simulation
+            float waveOffset = (float)Math.Sin(waterAnimationTime * effect.Speed + x * 0.1f) * effect.Intensity * 2f;
+
+            drawSession.DrawImage(texture,
+                new Windows.Foundation.Rect(x, y + waveOffset, tileSize, tileSize),
+                new Windows.Foundation.Rect(0, 0, texture.SizeInPixels.Width, texture.SizeInPixels.Height));
+
+            // Optional: Add a subtle overlay for shimmer effect
+            var overlayColor = Color.FromArgb(
+                (byte)(20 * effect.Intensity), // Alpha based on intensity
+                255, 255, 255); // White overlay
+
+            float shimmer = (float)Math.Sin(waterAnimationTime * effect.Speed * 2f + x * 0.05f + y * 0.05f);
+            if (shimmer > 0.7f)
+            {
+                drawSession.FillRectangle(x, y, tileSize, tileSize, overlayColor);
+            }
         }
     }
 }
