@@ -41,10 +41,19 @@
 		  <Content Include="Assets\Tiles\Sand.png">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		  </Content>
-		  <Content Include="Assets\Tiles\rock-monument.png">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		  </Content>
-		</ItemGroup>
+			<Content Include="Assets\Tiles\rock-monument.png">
+			  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			</Content>
+			<Content Include="Assets\Tiles\town1.png">
+			  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			</Content>
+			<Content Include="Assets\Tiles\castle1.png">
+			  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			</Content>
+			<Content Include="Assets\Tiles\castle2.png">
+			  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			</Content>
+		  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.5.240802000" />
