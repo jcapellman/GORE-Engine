@@ -17,8 +17,37 @@ namespace GORE.Engine
         /// <summary>
         /// Initialize and start the GORE Engine with splash screen.
         /// Call this from your App.xaml.cs OnLaunched method.
+        /// The engine will create its own window automatically.
+        /// </summary>
+        public static async System.Threading.Tasks.Task StartAsync()
+        {
+            if (_initialized) return;
+
+            // Create the main window automatically
+            _mainWindow = new Window();
+
+            // Load game configuration
+            var config = await Services.ConfigurationService.LoadConfigurationAsync();
+
+            // Initialize music system
+            // Note: Music files are optional, system will gracefully handle missing files
+
+            // Enter fullscreen and hide cursor
+            EnterFullScreenMode();
+
+            // Show GORE Engine splash screen
+            var splashScreen = new UI.SplashScreen(_mainWindow);
+            splashScreen.Activate();
+
+            _initialized = true;
+        }
+
+        /// <summary>
+        /// Initialize and start the GORE Engine with splash screen (legacy overload).
+        /// Call this from your App.xaml.cs OnLaunched method.
         /// </summary>
         /// <param name="mainWindow">The main application window</param>
+        [Obsolete("Use StartAsync() without parameters. The engine now creates its own window.")]
         public static async System.Threading.Tasks.Task StartAsync(Window mainWindow)
         {
             if (_initialized) return;

@@ -1,50 +1,63 @@
 # GORE Engine Test Application
 
-This is a simple WinUI 3 test application for the GORE Engine.
+A minimal WinUI 3 test application demonstrating GORE Engine integration.
 
 ## Project Structure
 
 ```
-test/GORETest/
-├── App.xaml              - Application definition
-├── App.xaml.cs           - Application code-behind (initializes GORE Engine)
-├── MainWindow.xaml       - Main window UI
-├── MainWindow.xaml.cs    - Main window code-behind
-├── game.json             - Game configuration for GORE Engine
+test/
+├── App.xaml              - Application definition with resource dictionary
+├── App.xaml.cs           - Application entry point (starts GORE Engine)
+├── game.json             - Game configuration
 ├── app.manifest          - Application manifest
 └── GORETest.csproj       - Project file
 ```
 
 ## How It Works
 
-The test app demonstrates the minimum setup required to use the GORE Engine:
+The test app demonstrates the **absolute minimum** setup required to use the GORE Engine:
 
-1. **App.xaml.cs**: In the `OnLaunched` method, we:
-   - Create the main window
-   - Initialize the GORE Engine by calling `GORE.Engine.GOREEngine.StartAsync(m_window)`
-   - Activate the window
+1. **App.xaml.cs**: Single line in `OnLaunched`:
+   ```csharp
+   await GORE.Engine.GOREEngine.StartAsync();
+   ```
+
+   The GORE Engine handles everything automatically:
+   - Window creation
+   - Fullscreen mode
+   - Cursor management
+   - Splash screen display
+   - Main menu transition
+   - Configuration loading
 
 2. **game.json**: Contains the game configuration that the GORE Engine loads
 
-3. **MainWindow**: A simple window with a test message
-
 ## Running the Test
 
-1. Set GORETest as the startup project in Visual Studio
+1. Set `GORETest` as the startup project in Visual Studio
 2. Press F5 to run
-3. The window should appear in fullscreen with the cursor hidden (as configured by GORE Engine)
+3. You'll see:
+   - GORE Engine splash screen (3 seconds)
+   - Automatic transition to main menu
+   - Fullscreen mode with hidden cursor
 
 ## What Gets Tested
 
-- GORE Engine initialization
-- Window management (fullscreen, cursor hiding)
-- Configuration loading from game.json
-- Basic WinUI 3 integration
+- ✅ GORE Engine initialization
+- ✅ Automatic window management
+- ✅ Splash screen display
+- ✅ Main menu screen
+- ✅ Configuration loading from game.json
+- ✅ WinUI 3 integration
 
-## Next Steps
+## Creating Your Own Game
 
-To create a full game:
-- Add pages that inherit from `BaseGamePage`, `BaseMainMenuPage`, or `BaseCharacterCreationPage`
-- Implement the abstract sprite rendering methods
-- Add game assets (sprites, music, etc.)
-- Configure navigation between pages
+To create a game using the GORE Engine:
+
+1. Create a new WinUI 3 application
+2. Add a reference to the GORE Engine project
+3. Create a `game.json` configuration file
+4. In `App.xaml.cs`, call `await GORE.Engine.GOREEngine.StartAsync();`
+5. Customize the main menu and add game screens
+
+That's it! The GORE Engine is a "batteries included" framework.

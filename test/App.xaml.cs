@@ -4,8 +4,6 @@ namespace GORETest
 {
     public partial class App : Application
     {
-        private Window m_window;
-
         public App()
         {
             InitializeComponent();
@@ -13,10 +11,8 @@ namespace GORETest
 
         protected override async void OnLaunched(LaunchActivatedEventArgs args)
         {
-            m_window = new MainWindow();
-
-            // Initialize and start GORE Engine (splash screen is shown automatically)
-            await GORE.Engine.GOREEngine.StartAsync(m_window);
+            // Initialize and start GORE Engine (window, splash screen, and main menu are all automatic)
+            await GORE.Engine.GOREEngine.StartAsync();
         }
     }
 }
