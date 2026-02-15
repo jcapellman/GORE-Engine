@@ -73,9 +73,14 @@ namespace GORE.Engine
                 sideDistY = (mapY + 1.0f - PlayerPosition.Y) * deltaDistY;
             }
 
-            // Perform DDA
-            while (!hit)
+            // Perform DDA with max distance limit
+            const int maxRaySteps = 20; // Limit ray distance for performance
+            int steps = 0;
+
+            while (!hit && steps < maxRaySteps)
             {
+                steps++;
+
                 // Jump to next map square in x or y direction
                 if (sideDistX < sideDistY)
                 {
