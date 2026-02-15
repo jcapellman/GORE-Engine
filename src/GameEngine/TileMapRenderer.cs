@@ -37,61 +37,42 @@ namespace GORE.GameEngine
         {
             this.screenWidth = screenWidth;
             this.screenHeight = screenHeight;
-            this.mapWidth = Math.Max(mapWidth, 64); // Ensure minimum size
+            this.mapWidth = Math.Max(mapWidth, 64);
             this.mapHeight = Math.Max(mapHeight, 64);
 
             PlayerPosition = new Vector2(this.mapWidth / 2, this.mapHeight / 2);
-            PlayerDirection = 0; // Facing down
+            PlayerDirection = 0;
             Locations = new List<WorldMapLocation>();
 
             System.Diagnostics.Debug.WriteLine($"TileMapRenderer created: Screen {screenWidth}x{screenHeight}, Map {this.mapWidth}x{this.mapHeight}");
-
-            GenerateProceduralMap();
         }
 
-        private void GenerateProceduralMap()
+        public void LoadMapData(int[][] tileData)
         {
-            mapData = new int[mapWidth, mapHeight];
-            var random = new Random(42); // Fixed seed for consistent map
-            
-            for (int y = 0; y < mapHeight; y++)
+            if (tileData == null || tileData.Length == 0)
             {
-                for (int x = 0; x < mapWidth; x++)
+                throw new InvalidOperationException("Map tile data is required! Add a 'tiles' array to the 'Terrain' layer in WorldMap.json");
+            }
+
+            System.Diagnostics.Debug.WriteLine($"Loading tile data: {tileData.Length} rows");
+
+            int height = tileData.Length;
+            int width = tileData[0].Length;
+
+            mapData = new int[width, height];
+
+            for (int y = 0; y < height && y < mapHeight; y++)
+            {
+                for (int x = 0; x < width && x < mapWidth; x++)
                 {
-                    int rand = random.Next(100);
-                    
-                    // Create landmasses with ocean borders
-                    if (x < 5 || x >= mapWidth - 5 || y < 5 || y >= mapHeight - 5)
+                    if (x < tileData[y].Length)
                     {
-                        mapData[x, y] = 0; // Ocean border
-                    }
-                    else if (rand < 50)
-                    {
-                        mapData[x, y] = 1; // Grass
-                    }
-                    else if (rand < 70)
-                    {
-                        mapData[x, y] = 2; // Forest
-                    }
-                    else if (rand < 80)
-                    {
-                        mapData[x, y] = 3; // Mountain
-                    }
-                    else if (rand < 90)
-                    {
-                        mapData[x, y] = 4; // Desert
-                    }
-                    else
-                    {
-                        mapData[x, y] = 0; // Ocean
+                        mapData[x, y] = tileData[y][x];
                     }
                 }
             }
-            
-            // Ensure starting position is walkable
-            int startX = (int)PlayerPosition.X;
-            int startY = (int)PlayerPosition.Y;
-            mapData[startX, startY] = 1; // Grass
+
+            System.Diagnostics.Debug.WriteLine($"✓ Loaded {width}x{height} tile map from JSON");
         }
 
         public void Render(CanvasDrawingSession drawSession)

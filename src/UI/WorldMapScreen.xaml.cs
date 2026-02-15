@@ -121,12 +121,9 @@ namespace GORE.UI
 
         private void CreateDefaultWorldMap()
         {
-            worldMap = new WorldMap
-            {
-                Name = "World of Balance",
-                Width = 256,
-                Height = 256
-            };
+            throw new InvalidOperationException(
+                "WorldMap.json is required but was not found or failed to load!\n" +
+                "Ensure WorldMap.json exists in test/Assets/Maps/ and is copied to output directory.");
         }
 
         private void SetupGameLoop()
@@ -243,9 +240,21 @@ namespace GORE.UI
             tileMapRenderer = new TileMapRenderer(
                 (int)sender.ActualWidth,
                 (int)sender.ActualHeight,
-                worldMap?.Width ?? 256,
-                worldMap?.Height ?? 256
+                worldMap?.Width ?? 64,
+                worldMap?.Height ?? 64
             );
+
+            // Load tile data from JSON - REQUIRED!
+            if (worldMap?.Layers != null && worldMap.Layers.Count > 0 && worldMap.Layers[0].Tiles != null)
+            {
+                tileMapRenderer.LoadMapData(worldMap.Layers[0].Tiles);
+            }
+            else
+            {
+                throw new InvalidOperationException(
+                    "WorldMap.json must contain a 'Terrain' layer with tile data!\n" +
+                    "Add a 'tiles' array to the first layer in WorldMap.json");
+            }
 
             // Pass locations to renderer
             if (worldMap?.Locations != null)
