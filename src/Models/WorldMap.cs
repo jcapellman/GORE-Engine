@@ -24,6 +24,7 @@ namespace GORE.Models
         public int X { get; set; }
         public int Y { get; set; }
         public string Type { get; set; }
+        public string Texture { get; set; }
         public bool Visited { get; set; }
     }
 

@@ -30,6 +30,7 @@ namespace GORE.GameEngine
 
         private int[,] mapData;
         private Dictionary<int, CanvasBitmap> tileTextures = new Dictionary<int, CanvasBitmap>();
+        private Dictionary<string, CanvasBitmap> locationTextures = new Dictionary<string, CanvasBitmap>();
 
         public TileMapRenderer(int screenWidth, int screenHeight, int mapWidth, int mapHeight)
         {
@@ -142,6 +143,50 @@ namespace GORE.GameEngine
             System.Diagnostics.Debug.WriteLine($"Using textures: {tileTextures.Count > 0}");
         }
 
+        public async System.Threading.Tasks.Task LoadLocationTexturesAsync(CanvasControl canvas, List<WorldMapLocation> locations)
+        {
+            if (locations == null || locations.Count == 0)
+            {
+                System.Diagnostics.Debug.WriteLine("No locations provided for texture loading");
+                return;
+            }
+
+            System.Diagnostics.Debug.WriteLine($"=== LOADING LOCATION TEXTURES ===");
+
+            foreach (var location in locations)
+            {
+                if (!string.IsNullOrEmpty(location.Texture))
+                {
+                    try
+                    {
+                        var baseDirectory = AppContext.BaseDirectory;
+                        var texturePath = System.IO.Path.Combine(baseDirectory, location.Texture);
+
+                        System.Diagnostics.Debug.WriteLine($"Loading texture for {location.Name}");
+                        System.Diagnostics.Debug.WriteLine($"  Path: {texturePath}");
+                        System.Diagnostics.Debug.WriteLine($"  Exists: {System.IO.File.Exists(texturePath)}");
+
+                        if (System.IO.File.Exists(texturePath))
+                        {
+                            var bitmap = await CanvasBitmap.LoadAsync(canvas, texturePath);
+                            locationTextures[location.Name] = bitmap;
+                            System.Diagnostics.Debug.WriteLine($"  ✓ Loaded {location.Name} texture: {bitmap.SizeInPixels.Width}x{bitmap.SizeInPixels.Height}");
+                        }
+                        else
+                        {
+                            System.Diagnostics.Debug.WriteLine($"  ✗ File not found");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"  ✗ Error loading {location.Name} texture: {ex.Message}");
+                    }
+                }
+            }
+
+            System.Diagnostics.Debug.WriteLine($"✓ Loaded {locationTextures.Count} location textures");
+        }
+
         public void Render(CanvasDrawingSession drawSession)
         {
             if (mapData == null)
@@ -226,20 +271,34 @@ namespace GORE.GameEngine
 
         private void DrawLocationMarker(CanvasDrawingSession drawSession, float x, float y, WorldMapLocation location)
         {
-            Color markerColor = location.Type switch
+            // Check if location has a texture
+            if (locationTextures.ContainsKey(location.Name))
             {
-                "town" => Color.FromArgb(255, 255, 255, 0),        // Bright Yellow
-                "dungeon" => Color.FromArgb(255, 255, 0, 0),       // Bright Red
-                "castle" => Color.FromArgb(255, 100, 100, 255),    // Bright Blue
-                _ => Color.FromArgb(255, 255, 255, 255)            // White
-            };
+                var texture = locationTextures[location.Name];
 
-            // Draw a larger, more visible marker
-            drawSession.FillRectangle(x + 2, y + 2, tileSize - 4, tileSize - 4, markerColor);
-            drawSession.DrawRectangle(x + 2, y + 2, tileSize - 4, tileSize - 4, Color.FromArgb(255, 0, 0, 0), 2);
+                // Draw texture with transparency support (alpha blending is automatic with DrawImage)
+                drawSession.DrawImage(texture,
+                    new Windows.Foundation.Rect(x, y, tileSize, tileSize),
+                    new Windows.Foundation.Rect(0, 0, texture.SizeInPixels.Width, texture.SizeInPixels.Height));
+            }
+            else
+            {
+                // Fallback to colored square if no texture
+                Color markerColor = location.Type switch
+                {
+                    "town" => Color.FromArgb(255, 255, 255, 0),        // Bright Yellow
+                    "dungeon" => Color.FromArgb(255, 255, 0, 0),       // Bright Red
+                    "castle" => Color.FromArgb(255, 100, 100, 255),    // Bright Blue
+                    _ => Color.FromArgb(255, 255, 255, 255)            // White
+                };
 
-            // Add a bright center dot for extra visibility
-            drawSession.FillCircle(x + tileSize / 2, y + tileSize / 2, 3, Color.FromArgb(255, 255, 255, 255));
+                // Draw a larger, more visible marker
+                drawSession.FillRectangle(x + 2, y + 2, tileSize - 4, tileSize - 4, markerColor);
+                drawSession.DrawRectangle(x + 2, y + 2, tileSize - 4, tileSize - 4, Color.FromArgb(255, 0, 0, 0), 2);
+
+                // Add a bright center dot for extra visibility
+                drawSession.FillCircle(x + tileSize / 2, y + tileSize / 2, 3, Color.FromArgb(255, 255, 255, 255));
+            }
         }
 
         private void DrawPlayerSprite(CanvasDrawingSession drawSession, float x, float y)

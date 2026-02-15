@@ -284,11 +284,14 @@ namespace GORE.UI
                 System.Diagnostics.Debug.WriteLine("✗ TerrainTypes is null or empty, cannot load textures!");
             }
 
-            // Pass locations to renderer
+            // Pass locations to renderer and load location textures
             if (worldMap?.Locations != null)
             {
                 tileMapRenderer.Locations = worldMap.Locations;
                 System.Diagnostics.Debug.WriteLine($"✓ Loaded {worldMap.Locations.Count} locations to renderer");
+
+                // Load location textures
+                await tileMapRenderer.LoadLocationTexturesAsync(sender, worldMap.Locations);
             }
 
             System.Diagnostics.Debug.WriteLine($"✓ TileMap renderer initialized with map: {worldMap?.Name ?? "Default"}");
