@@ -13,15 +13,46 @@ namespace GORE.Engine
     {
         private readonly Dictionary<string, ConfigVariable> _variables = new();
         private readonly string _configPath;
+        private bool _configLoadedSuccessfully;
+        private string _configStatusMessage;
 
         public IReadOnlyDictionary<string, ConfigVariable> Variables => _variables;
+        public string ConfigPath => _configPath;
+        public bool ConfigLoadedSuccessfully => _configLoadedSuccessfully;
+        public string ConfigStatusMessage => _configStatusMessage;
 
         public GameConfig(string configFileName = "config.json")
         {
             var baseDirectory = AppContext.BaseDirectory;
-            _configPath = Path.Combine(baseDirectory, configFileName);
-            
+            _configPath = ResolveConfigPath(baseDirectory, configFileName);
+
             RegisterDefaultVariables();
+        }
+
+        /// <summary>
+        /// Resolve config file path, checking multiple locations in priority order
+        /// </summary>
+        private string ResolveConfigPath(string baseDirectory, string configFileName)
+        {
+            // Priority order for config file locations:
+            // 1. Base directory (deployment location)
+            // 2. test subdirectory (development fallback)
+            var potentialPaths = new[]
+            {
+                Path.Combine(baseDirectory, configFileName),
+                Path.Combine(baseDirectory, "test", configFileName)
+            };
+
+            foreach (var path in potentialPaths)
+            {
+                if (File.Exists(path))
+                {
+                    return path;
+                }
+            }
+
+            // Default to base directory if none found (will be created on save)
+            return potentialPaths[0];
         }
 
         private void RegisterDefaultVariables()
@@ -90,22 +121,66 @@ namespace GORE.Engine
             {
                 if (!File.Exists(_configPath))
                 {
-                    System.Diagnostics.Debug.WriteLine($"Config file not found: {_configPath}");
+                    _configStatusMessage = $"Config not found - creating defaults at {Path.GetFileName(_configPath)}";
+                    _configLoadedSuccessfully = false;
+                    System.Diagnostics.Debug.WriteLine(_configStatusMessage);
                     SaveConfig(); // Create default config
+                    _configLoadedSuccessfully = true;
+                    _configStatusMessage = "Default config created successfully";
                     return;
                 }
 
                 var json = File.ReadAllText(_configPath);
-                var configData = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json);
 
-                if (configData == null)
+                // Try to parse JSON
+                Dictionary<string, JsonElement> configData;
+                try
+                {
+                    configData = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json);
+                }
+                catch (JsonException ex)
+                {
+                    _configStatusMessage = $"Invalid config JSON - regenerating defaults (Error: {ex.Message})";
+                    _configLoadedSuccessfully = false;
+                    System.Diagnostics.Debug.WriteLine(_configStatusMessage);
+
+                    // Backup corrupt config
+                    try
+                    {
+                        var backupPath = _configPath + ".corrupt.bak";
+                        File.Copy(_configPath, backupPath, true);
+                        System.Diagnostics.Debug.WriteLine($"  Backed up corrupt config to {Path.GetFileName(backupPath)}");
+                    }
+                    catch { /* Ignore backup errors */ }
+
+                    SaveConfig(); // Regenerate defaults
+                    _configLoadedSuccessfully = true;
+                    _configStatusMessage = "Config regenerated from defaults";
                     return;
+                }
+
+                if (configData == null || configData.Count == 0)
+                {
+                    _configStatusMessage = "Empty config - using defaults";
+                    _configLoadedSuccessfully = false;
+                    System.Diagnostics.Debug.WriteLine(_configStatusMessage);
+                    SaveConfig();
+                    _configLoadedSuccessfully = true;
+                    return;
+                }
 
                 int loadedCount = 0;
+                int failedCount = 0;
                 foreach (var kvp in configData)
                 {
                     var variable = Get(kvp.Key);
-                    if (variable == null || !variable.Flags.HasFlag(ConfigVariableFlags.Archive))
+                    if (variable == null)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"  Unknown config variable: {kvp.Key} (ignored)");
+                        continue;
+                    }
+
+                    if (!variable.Flags.HasFlag(ConfigVariableFlags.Archive))
                         continue;
 
                     try
@@ -113,7 +188,7 @@ namespace GORE.Engine
                         object value = kvp.Value.ValueKind switch
                         {
                             JsonValueKind.String => kvp.Value.GetString(),
-                            JsonValueKind.Number => kvp.Value.GetDouble(),
+                            JsonValueKind.Number => ConvertNumber(kvp.Value, variable),
                             JsonValueKind.True or JsonValueKind.False => kvp.Value.GetBoolean(),
                             _ => null
                         };
@@ -123,19 +198,50 @@ namespace GORE.Engine
                             variable.SetValue(value, silent: true);
                             loadedCount++;
                         }
+                        else
+                        {
+                            failedCount++;
+                            System.Diagnostics.Debug.WriteLine($"  Invalid value type for {kvp.Key} - using default");
+                        }
                     }
                     catch (Exception ex)
                     {
-                        System.Diagnostics.Debug.WriteLine($"Failed to load config variable {kvp.Key}: {ex.Message}");
+                        failedCount++;
+                        System.Diagnostics.Debug.WriteLine($"  Failed to load {kvp.Key}: {ex.Message} - using default");
                     }
                 }
 
-                System.Diagnostics.Debug.WriteLine($"✓ Loaded {loadedCount} config variables from {_configPath}");
+                _configLoadedSuccessfully = true;
+                _configStatusMessage = failedCount > 0 
+                    ? $"Loaded {loadedCount} settings ({failedCount} using defaults)" 
+                    : $"Loaded {loadedCount} settings";
+
+                System.Diagnostics.Debug.WriteLine($"✓ {_configStatusMessage} from {Path.GetFileName(_configPath)}");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"✗ Failed to load config: {ex.Message}");
+                _configStatusMessage = $"Config load failed - using defaults (Error: {ex.Message})";
+                _configLoadedSuccessfully = false;
+                System.Diagnostics.Debug.WriteLine($"✗ {_configStatusMessage}");
+                // Continue with defaults - don't crash
             }
+        }
+
+        /// <summary>
+        /// Convert JSON number to the appropriate type based on variable type
+        /// </summary>
+        private object ConvertNumber(JsonElement element, ConfigVariable variable)
+        {
+            var valueType = variable.GetValue<object>().GetType();
+
+            if (valueType == typeof(int))
+                return element.GetInt32();
+            else if (valueType == typeof(float))
+                return (float)element.GetDouble();
+            else if (valueType == typeof(double))
+                return element.GetDouble();
+            else
+                return element.GetDouble(); // Default to double
         }
 
         public void SaveConfig()

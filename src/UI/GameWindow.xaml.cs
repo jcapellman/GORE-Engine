@@ -80,7 +80,8 @@ namespace GORE.UI
                 // Initialize Config
                 LogInit("Initializing configuration system...");
                 InitializeConfig();
-                LogInit($"  Config loaded from: {Path.Combine(AppContext.BaseDirectory, "config.json")}");
+                LogInit($"  {_config.ConfigStatusMessage}");
+                LogInit($"  Config file: {Path.GetFileName(_config.ConfigPath)}");
 
                 // Initialize Console
                 LogInit("Initializing game console...");
@@ -101,12 +102,11 @@ namespace GORE.UI
                 // Initialize map
                 LogInit("Loading initial map...");
                 var mapPath = Path.Combine(baseDirectory, "gt1", "maps", "e1m1.map");
-                var textureCfgPath = Path.Combine(baseDirectory, "gt1", "maps", "textures.cfg");
 
                 MapData mapData;
                 try
                 {
-                    mapData = await MapLoader.LoadMapAsync(mapPath, textureCfgPath);
+                    mapData = await MapLoader.LoadMapAsync(mapPath);
                     LogInit($"  Map: {mapData.Name}");
                     LogInit($"  Dimensions: {mapData.Width}x{mapData.Height}");
                     LogInit($"  Textures defined: {mapData.TextureMapping.Count}");
@@ -159,8 +159,8 @@ namespace GORE.UI
 
                 // Initialize renderer
                 LogInit("Initializing 3D renderer...");
-                int renderWidth = _config.GetValue("r_width", 640);
-                int renderHeight = _config.GetValue("r_height", 480);
+                int renderWidth = GetConfigValue("r_width", 640);
+                int renderHeight = GetConfigValue("r_height", 480);
                 _renderer = new Renderer3D(renderWidth, renderHeight, _raycastEngine);
                 LogInit($"  Resolution: {renderWidth}x{renderHeight}");
                 LogInit("  Win2D hardware acceleration enabled");
@@ -185,7 +185,7 @@ namespace GORE.UI
                 LogInit("");
 
                 // Pause for effect (BUILD engine style)
-                await System.Threading.Tasks.Task.Delay(1000);
+                await System.Threading.Tasks.Task.Delay(2000);
 
                 // Hide init screen and show game
                 InitScreen.Visibility = Visibility.Collapsed;
@@ -296,6 +296,13 @@ namespace GORE.UI
             _config = new GameConfig();
             _config.LoadConfig();
 
+            // Validate and clamp critical config values to safe ranges
+            ValidateConfigValue("r_width", 320, 7680, 640);
+            ValidateConfigValue("r_height", 240, 4320, 480);
+            ValidateConfigValue("r_fov", 60.0f, 120.0f, 90.0f);
+            ValidateConfigValue("m_sensitivity", 0.0001f, 0.1f, 0.002f);
+            ValidateConfigValue("r_maxfps", 30, 300, 60);
+
             // Cache frequently accessed config values
             UpdateCachedConfigValues();
 
@@ -311,10 +318,43 @@ namespace GORE.UI
             mouseSensitivityVar.OnChanged += OnConfigChanged;
         }
 
+        /// <summary>
+        /// Validate and clamp a config value to a safe range
+        /// </summary>
+        private void ValidateConfigValue<T>(string name, T min, T max, T defaultValue) where T : IComparable<T>
+        {
+            var variable = _config.Get(name);
+            if (variable == null) return;
+
+            var currentValue = variable.GetValue<T>();
+
+            // Clamp to valid range
+            if (currentValue.CompareTo(min) < 0)
+            {
+                System.Diagnostics.Debug.WriteLine($"  Config {name} too low ({currentValue}), clamping to {min}");
+                variable.SetValue(min, silent: true);
+            }
+            else if (currentValue.CompareTo(max) > 0)
+            {
+                System.Diagnostics.Debug.WriteLine($"  Config {name} too high ({currentValue}), clamping to {max}");
+                variable.SetValue(max, silent: true);
+            }
+        }
+
+        /// <summary>
+        /// Safely get a config value with fallback default
+        /// </summary>
+        private T GetConfigValue<T>(string name, T defaultValue)
+        {
+            if (_config == null) return defaultValue;
+            return _config.GetValue(name, defaultValue);
+        }
+
         private void UpdateCachedConfigValues()
         {
-            _showFps = _config.GetValue("r_showfps", true);
-            _mouseSensitivity = _config.GetValue("m_sensitivity", 0.002f);
+            // Always use safe defaults if config is missing or invalid
+            _showFps = GetConfigValue("r_showfps", true);
+            _mouseSensitivity = GetConfigValue("m_sensitivity", 0.002f);
         }
 
         private void OnConfigChanged(ConfigVariable variable)
@@ -372,14 +412,13 @@ namespace GORE.UI
             {
                 var baseDirectory = AppContext.BaseDirectory;
                 var mapPath = System.IO.Path.Combine(baseDirectory, "gt1", "maps", $"{mapName}.map");
-                var textureCfgPath = System.IO.Path.Combine(baseDirectory, "gt1", "maps", "textures.cfg");
 
                 _console.AddToHistory($"Loading map: {mapName}...");
 
                 MapData mapData;
                 try
                 {
-                    mapData = await MapLoader.LoadMapAsync(mapPath, textureCfgPath);
+                    mapData = await MapLoader.LoadMapAsync(mapPath);
                     _console.AddToHistory($"✓ Map '{mapData.Name}' loaded successfully");
                 }
                 catch (FileNotFoundException)
@@ -433,8 +472,8 @@ namespace GORE.UI
                 _raycastEngine.PlayerPosition = mapData.PlayerStart;
 
                 // Update renderer with resolution from config
-                int renderWidth = _config.GetValue("r_width", 640);
-                int renderHeight = _config.GetValue("r_height", 480);
+                int renderWidth = GetConfigValue("r_width", 640);
+                int renderHeight = GetConfigValue("r_height", 480);
                 _renderer = new Renderer3D(renderWidth, renderHeight, _raycastEngine);
 
                 // Reset initialization flags

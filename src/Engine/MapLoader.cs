@@ -19,14 +19,11 @@ namespace GORE.Engine
 
     public class MapLoader
     {
-        public static async Task<MapData> LoadMapAsync(string mapPath, string textureCfgPath)
+        /// <summary>
+        /// Load a map from a .map file with embedded metadata and textures
+        /// </summary>
+        public static async Task<MapData> LoadMapAsync(string mapPath)
         {
-            var mapData = new MapData
-            {
-                PlayerStart = new Vector2(2.5f, 2.5f),
-                TextureMapping = new Dictionary<int, string>()
-            };
-
             if (!File.Exists(mapPath))
             {
                 throw new FileNotFoundException($"Map file not found: {mapPath}");
@@ -34,64 +31,22 @@ namespace GORE.Engine
 
             var lines = await File.ReadAllLinesAsync(mapPath);
 
-            // Check if this is the new format (contains sections)
-            bool isNewFormat = lines.Any(l => l.Trim().StartsWith("["));
+            // Validate format
+            bool hasMetadataSection = lines.Any(l => l.Trim().Equals("[Metadata]", StringComparison.OrdinalIgnoreCase));
+            bool hasTexturesSection = lines.Any(l => l.Trim().Equals("[Textures]", StringComparison.OrdinalIgnoreCase));
+            bool hasGridSection = lines.Any(l => l.Trim().Equals("[Grid]", StringComparison.OrdinalIgnoreCase));
 
-            if (isNewFormat)
+            if (!hasMetadataSection || !hasTexturesSection || !hasGridSection)
             {
-                return await LoadMapWithMetadataAsync(mapPath, lines);
+                throw new InvalidDataException(
+                    "Invalid map format. Map must contain [Metadata], [Textures], and [Grid] sections. " +
+                    "Legacy format is no longer supported.");
             }
-            else
-            {
-                // Legacy format - load texture mapping from separate file
-                if (File.Exists(textureCfgPath))
-                {
-                    var textureLines = await File.ReadAllLinesAsync(textureCfgPath);
-                    foreach (var line in textureLines)
-                    {
-                        if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#'))
-                            continue;
 
-                        var parts = line.Split(',');
-                        if (parts.Length == 2 && int.TryParse(parts[0], out int id))
-                        {
-                            mapData.TextureMapping[id] = parts[1].Trim();
-                        }
-                    }
-                }
-
-                // Load map grid
-                var gridLines = lines.Where(l => !string.IsNullOrWhiteSpace(l) && !l.StartsWith('#')).ToList();
-
-                if (gridLines.Count == 0)
-                {
-                    throw new InvalidDataException("Map file is empty or contains only comments");
-                }
-
-                int height = gridLines.Count;
-                int width = gridLines[0].Split(',').Length;
-
-                mapData.Grid = new int[height, width];
-                mapData.Width = width;
-                mapData.Height = height;
-
-                for (int y = 0; y < height; y++)
-                {
-                    var values = gridLines[y].Split(',');
-                    for (int x = 0; x < width && x < values.Length; x++)
-                    {
-                        if (int.TryParse(values[x].Trim(), out int value))
-                        {
-                            mapData.Grid[y, x] = value;
-                        }
-                    }
-                }
-
-                return mapData;
-            }
+            return ParseMapFile(lines);
         }
 
-        private static async Task<MapData> LoadMapWithMetadataAsync(string mapPath, string[] lines)
+        private static MapData ParseMapFile(string[] lines)
         {
             var mapData = new MapData
             {
@@ -106,15 +61,18 @@ namespace GORE.Engine
             {
                 var trimmedLine = line.Trim();
 
+                // Skip empty lines and comments
                 if (string.IsNullOrWhiteSpace(trimmedLine) || trimmedLine.StartsWith('#'))
                     continue;
 
+                // Check for section headers
                 if (trimmedLine.StartsWith("[") && trimmedLine.EndsWith("]"))
                 {
                     currentSection = trimmedLine.Substring(1, trimmedLine.Length - 2);
                     continue;
                 }
 
+                // Parse based on current section
                 switch (currentSection)
                 {
                     case "Metadata":
@@ -129,10 +87,10 @@ namespace GORE.Engine
                 }
             }
 
-            // Parse grid
+            // Parse grid data
             if (gridLines.Count == 0)
             {
-                throw new InvalidDataException("Map file contains no grid data");
+                throw new InvalidDataException("Map file contains no grid data in [Grid] section");
             }
 
             int height = gridLines.Count;
@@ -154,6 +112,12 @@ namespace GORE.Engine
                         mapData.Grid[y, x] = value;
                     }
                 }
+            }
+
+            // Validate that we have texture mappings
+            if (mapData.TextureMapping.Count == 0)
+            {
+                throw new InvalidDataException("Map file contains no texture definitions in [Textures] section");
             }
 
             return mapData;
