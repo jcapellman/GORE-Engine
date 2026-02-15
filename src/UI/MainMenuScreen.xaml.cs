@@ -210,8 +210,26 @@ namespace GORE.UI
 
         private void NewGame_Click(object sender, PointerRoutedEventArgs e)
         {
-            // TODO: Transition to character creation screen
-            System.Diagnostics.Debug.WriteLine("New Game selected");
+            System.Diagnostics.Debug.WriteLine("New Game selected - Starting world map");
+
+            var defaultCharacter = new Models.Character("Terra")
+            {
+                Level = 1,
+                MaxHP = 100,
+                CurrentHP = 100,
+                MaxMP = 50,
+                CurrentMP = 50,
+                Attack = 10,
+                Defense = 8,
+                Magic = 12,
+                Speed = 10,
+                Experience = 0,
+                X = 128,
+                Y = 128
+            };
+
+            var worldMapScreen = new WorldMapScreen(this, defaultCharacter);
+            worldMapScreen.Activate();
         }
 
         private void LoadGame_Click(object sender, PointerRoutedEventArgs e)
