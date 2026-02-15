@@ -2,9 +2,11 @@ using GORE.Engine;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Animation;
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Numerics;
 using Windows.System;
 
@@ -15,6 +17,8 @@ namespace GORE.UI
         private RaycastEngine _raycastEngine;
         private Renderer3D _renderer;
         private bool _isGameLoopRunning;
+        private GameConsole _console;
+        private bool _consoleVisible;
 
         private bool _moveForward;
         private bool _moveBackward;
@@ -34,7 +38,17 @@ namespace GORE.UI
         public GameWindow()
         {
             InitializeComponent();
+            InitializeConsole();
             _ = InitializeGameAsync();
+        }
+
+        private void InitializeConsole()
+        {
+            _console = new GameConsole();
+            _console.OnHistoryChanged += UpdateConsoleDisplay;
+            _console.AddToHistory("GORE Engine Console");
+            _console.AddToHistory("Type 'help' for available commands");
+            _console.AddToHistory("");
         }
 
         private async System.Threading.Tasks.Task InitializeGameAsync()
@@ -79,6 +93,61 @@ namespace GORE.UI
 
             ViewportImage.Source = _renderer.GetBitmap();
 
+            // Register game-specific console commands
+            _console.RegisterGameCommands(_raycastEngine, 
+                health => _health = health, 
+                ammo => _ammo = ammo);
+
+            // Register map loading command
+            _console.RegisterCommand("map", "Load a map (usage: map <mapname>)", async args =>
+            {
+                if (args.Length == 0)
+                {
+                    _console.AddToHistory("Usage: map <mapname>");
+                    _console.AddToHistory("Example: map e1m1");
+                    return;
+                }
+
+                var mapName = args[0];
+                await LoadMapAsync(mapName);
+            });
+
+            // Register map listing command
+            _console.RegisterCommand("maps", "List available maps", args =>
+            {
+                try
+                {
+                    var baseDirectory = AppContext.BaseDirectory;
+                    var mapsDirectory = System.IO.Path.Combine(baseDirectory, "gt1", "maps");
+
+                    if (!Directory.Exists(mapsDirectory))
+                    {
+                        _console.AddToHistory("Maps directory not found");
+                        return;
+                    }
+
+                    var mapFiles = Directory.GetFiles(mapsDirectory, "*.map");
+
+                    if (mapFiles.Length == 0)
+                    {
+                        _console.AddToHistory("No maps found");
+                        return;
+                    }
+
+                    _console.AddToHistory("Available maps:");
+                    foreach (var mapFile in mapFiles.OrderBy(f => f))
+                    {
+                        var mapName = Path.GetFileNameWithoutExtension(mapFile);
+                        _console.AddToHistory($"  {mapName}");
+                    }
+                    _console.AddToHistory($"Total: {mapFiles.Length} map(s)");
+                }
+                catch (Exception ex)
+                {
+                    _console.AddToHistory($"Error listing maps: {ex.Message}");
+                }
+            });
+
             // Setup game loop using CompositionTarget for better frame timing
             _frameTimer = Stopwatch.StartNew();
             _isGameLoopRunning = true;
@@ -113,6 +182,81 @@ namespace GORE.UI
             }
 
             await System.Threading.Tasks.Task.CompletedTask;
+        }
+
+        private async System.Threading.Tasks.Task LoadMapAsync(string mapName)
+        {
+            try
+            {
+                var baseDirectory = AppContext.BaseDirectory;
+                var mapPath = System.IO.Path.Combine(baseDirectory, "gt1", "maps", $"{mapName}.map");
+                var textureCfgPath = System.IO.Path.Combine(baseDirectory, "gt1", "maps", "textures.cfg");
+
+                _console.AddToHistory($"Loading map: {mapName}...");
+
+                MapData mapData;
+                try
+                {
+                    mapData = await MapLoader.LoadMapAsync(mapPath, textureCfgPath);
+                    _console.AddToHistory($"✓ Map '{mapData.Name}' loaded successfully");
+                }
+                catch (FileNotFoundException)
+                {
+                    _console.AddToHistory($"✗ Map file not found: {mapName}.map");
+                    _console.AddToHistory($"  Searched in: gt1/maps/");
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    _console.AddToHistory($"✗ Failed to load map: {ex.Message}");
+                    return;
+                }
+
+                // Stop the game loop temporarily
+                var wasRunning = _isGameLoopRunning;
+                _isGameLoopRunning = false;
+
+                // Update raycasting engine with new map
+                _raycastEngine = new RaycastEngine(mapData.Grid);
+                _raycastEngine.PlayerPosition = mapData.PlayerStart;
+
+                // Update renderer
+                _renderer = new Renderer3D(640, 480, _raycastEngine);
+
+                // Load textures for the new map
+                foreach (var texMapping in mapData.TextureMapping)
+                {
+                    try
+                    {
+                        await _renderer.LoadTextureAsync(texMapping.Key, texMapping.Value);
+                    }
+                    catch (Exception ex)
+                    {
+                        _console.AddToHistory($"  Warning: Failed to load texture {texMapping.Value}: {ex.Message}");
+                    }
+                }
+
+                ViewportImage.Source = _renderer.GetBitmap();
+
+                // Re-register console commands with the new engine instance
+                _console.RegisterGameCommands(_raycastEngine,
+                    health => _health = health,
+                    ammo => _ammo = ammo);
+
+                // Restart the game loop if it was running
+                if (wasRunning)
+                {
+                    _isGameLoopRunning = true;
+                }
+
+                _console.AddToHistory($"Map loaded: {mapData.Width}x{mapData.Height}");
+                _console.AddToHistory($"Player spawned at ({mapData.PlayerStart.X:F2}, {mapData.PlayerStart.Y:F2})");
+            }
+            catch (Exception ex)
+            {
+                _console.AddToHistory($"✗ Unexpected error loading map: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Map load error: {ex}");
+            }
         }
 
         private void RootGrid_Loaded(object sender, RoutedEventArgs e)
@@ -204,14 +348,120 @@ namespace GORE.UI
 
         private void RootGrid_KeyDown(object sender, KeyRoutedEventArgs e)
         {
+            // Toggle console with ~ key (grave accent, key code 192)
+            if ((int)e.Key == 192 || e.Key == (VirtualKey)192)
+            {
+                ToggleConsole();
+                e.Handled = true;
+                return;
+            }
+
+            // Don't process game input if console is open
+            if (_consoleVisible)
+            {
+                e.Handled = false;
+                return;
+            }
+
             HandleKeyInput(e.Key, true);
             e.Handled = true;
         }
 
         private void RootGrid_KeyUp(object sender, KeyRoutedEventArgs e)
         {
+            // Don't process game input if console is open
+            if (_consoleVisible)
+            {
+                e.Handled = false;
+                return;
+            }
+
             HandleKeyInput(e.Key, false);
             e.Handled = true;
+        }
+
+        private void ToggleConsole()
+        {
+            _consoleVisible = !_consoleVisible;
+
+            if (_consoleVisible)
+            {
+                // Show console with slide-down animation
+                ConsoleOverlay.Visibility = Visibility.Visible;
+                var animation = new DoubleAnimation
+                {
+                    From = -400,
+                    To = 0,
+                    Duration = TimeSpan.FromMilliseconds(200),
+                    EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+                };
+
+                var storyboard = new Storyboard();
+                storyboard.Children.Add(animation);
+                Storyboard.SetTarget(animation, ConsoleTransform);
+                Storyboard.SetTargetProperty(animation, "Y");
+                storyboard.Begin();
+
+                // Focus the input box
+                ConsoleInput.Focus(FocusState.Programmatic);
+            }
+            else
+            {
+                // Hide console with slide-up animation
+                var animation = new DoubleAnimation
+                {
+                    From = 0,
+                    To = -400,
+                    Duration = TimeSpan.FromMilliseconds(200),
+                    EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseIn }
+                };
+
+                var storyboard = new Storyboard();
+                storyboard.Children.Add(animation);
+                Storyboard.SetTarget(animation, ConsoleTransform);
+                Storyboard.SetTargetProperty(animation, "Y");
+                storyboard.Completed += (s, e) =>
+                {
+                    ConsoleOverlay.Visibility = Visibility.Collapsed;
+                };
+                storyboard.Begin();
+
+                // Return focus to game
+                RootGrid.Focus(FocusState.Programmatic);
+            }
+        }
+
+        private void ConsoleInput_KeyDown(object sender, KeyRoutedEventArgs e)
+        {
+            if (e.Key == VirtualKey.Enter)
+            {
+                var input = ConsoleInput.Text;
+                ConsoleInput.Text = string.Empty;
+                _console.ExecuteCommand(input);
+                e.Handled = true;
+            }
+            else if (e.Key == VirtualKey.Up)
+            {
+                ConsoleInput.Text = _console.GetPreviousCommand();
+                ConsoleInput.SelectionStart = ConsoleInput.Text.Length;
+                e.Handled = true;
+            }
+            else if (e.Key == VirtualKey.Down)
+            {
+                ConsoleInput.Text = _console.GetNextCommand();
+                ConsoleInput.SelectionStart = ConsoleInput.Text.Length;
+                e.Handled = true;
+            }
+            else if ((int)e.Key == 192 || e.Key == (VirtualKey)192) // ~ key
+            {
+                ToggleConsole();
+                e.Handled = true;
+            }
+            else if (e.Key == VirtualKey.Escape)
+            {
+                ToggleConsole();
+                e.Handled = true;
+            }
         }
 
         private void HandleKeyInput(VirtualKey key, bool isPressed)
@@ -253,12 +503,29 @@ namespace GORE.UI
                 case VirtualKey.Escape:
                     if (isPressed)
                     {
-                        _isGameLoopRunning = false;
-                        CompositionTarget.Rendering -= OnRendering;
-                        Close();
+                        // If console is open, just close it, don't exit the game
+                        if (_consoleVisible)
+                        {
+                            ToggleConsole();
+                        }
+                        else
+                        {
+                            _isGameLoopRunning = false;
+                            CompositionTarget.Rendering -= OnRendering;
+                            Close();
+                        }
                     }
                     break;
             }
+        }
+
+        private void UpdateConsoleDisplay()
+        {
+            ConsoleHistoryText.Text = string.Join("\n", _console.History);
+
+            // Auto-scroll to bottom
+            ConsoleScrollViewer.UpdateLayout();
+            ConsoleScrollViewer.ChangeView(null, ConsoleScrollViewer.ScrollableHeight, null);
         }
     }
 }
