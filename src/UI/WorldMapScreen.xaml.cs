@@ -12,6 +12,7 @@ using System.Numerics;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Windows.Storage;
+using Windows.UI;
 
 namespace GORE.UI
 {
@@ -215,6 +216,7 @@ namespace GORE.UI
             }
 
             MapCanvas.Invalidate();
+            MinimapCanvas?.Invalidate(); // Update minimap for player position flash
         }
 
         private void CheckForEncounter()
@@ -295,6 +297,85 @@ namespace GORE.UI
         private void MapCanvas_Draw(CanvasControl sender, CanvasDrawEventArgs args)
         {
             tileMapRenderer?.Render(args.DrawingSession);
+        }
+
+        private void MinimapCanvas_Draw(CanvasControl sender, CanvasDrawEventArgs args)
+        {
+            if (tileMapRenderer == null || worldMap == null) return;
+
+            var session = args.DrawingSession;
+
+            // Calculate scale to fit entire map in 128x128 minimap
+            float mapWidth = worldMap.Width;
+            float mapHeight = worldMap.Height;
+            float minimapSize = 128f;
+            float scale = Math.Min(minimapSize / mapWidth, minimapSize / mapHeight);
+
+            // Draw simplified map (each pixel = one tile)
+            for (int y = 0; y < worldMap.Height; y++)
+            {
+                for (int x = 0; x < worldMap.Width; x++)
+                {
+                    int terrain = tileMapRenderer.GetTerrainAt(x, y);
+                    Color color;
+
+                    // Simplified colors for minimap
+                    switch (terrain)
+                    {
+                        case 0: // Water
+                            color = Color.FromArgb(255, 30, 77, 139);
+                            break;
+                        case 1: // Grass
+                            color = Color.FromArgb(255, 94, 170, 60);
+                            break;
+                        case 2: // Sand
+                            color = Color.FromArgb(255, 212, 165, 116);
+                            break;
+                        default:
+                            color = Color.FromArgb(255, 128, 128, 128);
+                            break;
+                    }
+
+                    float px = x * scale;
+                    float py = y * scale;
+                    session.FillRectangle(px, py, scale, scale, color);
+                }
+            }
+
+            // Draw location markers on minimap
+            if (worldMap.Locations != null)
+            {
+                foreach (var loc in worldMap.Locations)
+                {
+                    float locX = loc.X * scale;
+                    float locY = loc.Y * scale;
+
+                    Color markerColor = loc.Type switch
+                    {
+                        "town" => Color.FromArgb(255, 255, 255, 0),
+                        "dungeon" => Color.FromArgb(255, 255, 0, 0),
+                        _ => Color.FromArgb(255, 255, 255, 255)
+                    };
+
+                    // Small square marker
+                    session.FillRectangle(locX - 1, locY - 1, 3, 3, markerColor);
+                }
+            }
+
+            // Draw player position as a flashing white dot
+            var playerPos = tileMapRenderer.PlayerPosition;
+            float playerX = playerPos.X * scale;
+            float playerY = playerPos.Y * scale;
+
+            // Flash effect based on time
+            bool flash = (DateTime.Now.Millisecond / 500) % 2 == 0;
+            if (flash)
+            {
+                session.FillCircle(playerX, playerY, 2, Color.FromArgb(255, 255, 255, 255));
+            }
+
+            // Border around minimap
+            session.DrawRectangle(0, 0, minimapSize, minimapSize, Color.FromArgb(255, 255, 255, 255), 1);
         }
 
         private void RootGrid_KeyDown(object sender, KeyRoutedEventArgs e)

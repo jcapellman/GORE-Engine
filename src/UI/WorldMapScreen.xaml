@@ -18,5 +18,20 @@
             Draw="MapCanvas_Draw"
             CreateResources="MapCanvas_CreateResources"
             ClearColor="Black"/>
+
+        <!-- Minimap (top-right corner like FF1) -->
+        <Border VerticalAlignment="Top" 
+                HorizontalAlignment="Right" 
+                Background="#E0000000" 
+                BorderBrush="White" 
+                BorderThickness="2"
+                Margin="20"
+                Padding="4">
+            <canvas:CanvasControl 
+                x:Name="MinimapCanvas"
+                Width="128"
+                Height="128"
+                Draw="MinimapCanvas_Draw"/>
+        </Border>
     </Grid>
 </Window>
