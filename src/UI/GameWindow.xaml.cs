@@ -26,6 +26,10 @@ namespace GORE.UI
         private int _health = 100;
         private int _ammo = 50;
 
+        // FPS tracking
+        private int _frameCount = 0;
+        private DateTime _lastFpsUpdate = DateTime.Now;
+
         public GameWindow()
         {
             InitializeComponent();
@@ -175,6 +179,17 @@ namespace GORE.UI
             // Quake 3 style - just the numbers
             HealthText.Text = _health.ToString();
             AmmoText.Text = _ammo.ToString();
+
+            // Update FPS counter
+            _frameCount++;
+            var elapsed = (DateTime.Now - _lastFpsUpdate).TotalSeconds;
+            if (elapsed >= 1.0)
+            {
+                var fps = (int)(_frameCount / elapsed);
+                FpsText.Text = $"{fps}fps";
+                _frameCount = 0;
+                _lastFpsUpdate = DateTime.Now;
+            }
         }
 
         private void RootGrid_KeyDown(object sender, KeyRoutedEventArgs e)
