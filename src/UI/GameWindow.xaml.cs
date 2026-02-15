@@ -1,9 +1,12 @@
 using GORE.Engine;
+using Microsoft.Graphics.Canvas.UI.Xaml;
+using Microsoft.Graphics.Canvas;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -20,6 +23,9 @@ namespace GORE.UI
         private GameConsole _console;
         private GameConfig _config;
         private bool _consoleVisible;
+        private Dictionary<int, string> _pendingTextureMapping;
+        private bool _isLoadingTextures;
+        private bool _resourcesInitialized;
 
         private bool _moveForward;
         private bool _moveBackward;
@@ -112,14 +118,11 @@ namespace GORE.UI
             _renderer = new Renderer3D(renderWidth, renderHeight, _raycastEngine);
 
             _console.AddToHistory($"Renderer initialized at {renderWidth}x{renderHeight}");
+            _console.AddToHistory("Win2D hardware acceleration enabled");
 
-            // Load textures
-            foreach (var texMapping in mapData.TextureMapping)
-            {
-                await _renderer.LoadTextureAsync(texMapping.Key, texMapping.Value);
-            }
-
-            ViewportImage.Source = _renderer.GetBitmap();
+            // Note: Textures will be loaded when Win2D canvas is ready
+            // Store texture mapping for later
+            _pendingTextureMapping = mapData.TextureMapping;
 
             // Register game-specific console commands
             _console.RegisterGameCommands(_raycastEngine, 
@@ -176,10 +179,9 @@ namespace GORE.UI
                 }
             });
 
-            // Setup game loop using CompositionTarget for better frame timing
+            // Setup frame timer
             _frameTimer = Stopwatch.StartNew();
             _isGameLoopRunning = true;
-            CompositionTarget.Rendering += OnRendering;
         }
 
         private async System.Threading.Tasks.Task LoadCustomFontAsync()
@@ -244,6 +246,9 @@ namespace GORE.UI
                 var wasRunning = _isGameLoopRunning;
                 _isGameLoopRunning = false;
 
+                // Dispose old renderer
+                _renderer?.Dispose();
+
                 // Update raycasting engine with new map
                 _raycastEngine = new RaycastEngine(mapData.Grid);
                 _raycastEngine.PlayerPosition = mapData.PlayerStart;
@@ -253,20 +258,36 @@ namespace GORE.UI
                 int renderHeight = _config.GetValue("r_height", 480);
                 _renderer = new Renderer3D(renderWidth, renderHeight, _raycastEngine);
 
-                // Load textures for the new map
-                foreach (var texMapping in mapData.TextureMapping)
-                {
-                    try
-                    {
-                        await _renderer.LoadTextureAsync(texMapping.Key, texMapping.Value);
-                    }
-                    catch (Exception ex)
-                    {
-                        _console.AddToHistory($"  Warning: Failed to load texture {texMapping.Value}: {ex.Message}");
-                    }
-                }
+                // Reset initialization flags
+                _resourcesInitialized = false;
+                _isLoadingTextures = false;
 
-                ViewportImage.Source = _renderer.GetBitmap();
+                // Initialize Win2D resources if canvas is ready
+                if (ViewportCanvas.Device != null)
+                {
+                    _renderer.InitializeResources(ViewportCanvas.Device);
+                    _resourcesInitialized = true;
+
+                    // Load textures for the new map
+                    _isLoadingTextures = true;
+                    foreach (var texMapping in mapData.TextureMapping)
+                    {
+                        try
+                        {
+                            await _renderer.LoadTextureAsync(texMapping.Key, texMapping.Value, ViewportCanvas.Device);
+                        }
+                        catch (Exception ex)
+                        {
+                            _console.AddToHistory($"  Warning: Failed to load texture {texMapping.Value}: {ex.Message}");
+                        }
+                    }
+                    _isLoadingTextures = false;
+                }
+                else
+                {
+                    // Store for later loading
+                    _pendingTextureMapping = mapData.TextureMapping;
+                }
 
                 // Re-register console commands with the new engine instance
                 _console.RegisterGameCommands(_raycastEngine,
@@ -294,14 +315,39 @@ namespace GORE.UI
             RootGrid.Focus(FocusState.Programmatic);
         }
 
-        private void OnRendering(object sender, object e)
+        private void ViewportCanvas_Update(ICanvasAnimatedControl sender, CanvasAnimatedUpdateEventArgs args)
         {
-            if (!_isGameLoopRunning || _renderer == null)
+            if (!_isGameLoopRunning || _renderer == null || _raycastEngine == null)
                 return;
 
-            // Calculate delta time using high-precision stopwatch
-            float deltaTime = (float)_frameTimer.Elapsed.TotalSeconds;
-            _frameTimer.Restart();
+            // Initialize Win2D resources on first update if needed
+            if (!_resourcesInitialized && _renderer.GetRenderTarget() == null)
+            {
+                try
+                {
+                    _renderer.InitializeResources(sender.Device);
+                    _resourcesInitialized = true;
+
+                    // Start loading textures asynchronously
+                    if (_pendingTextureMapping != null && !_isLoadingTextures)
+                    {
+                        _isLoadingTextures = true;
+                        _ = LoadTexturesAsync(sender.Device);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Failed to initialize resources: {ex.Message}");
+                    return;
+                }
+            }
+
+            // Don't update game logic while loading textures
+            if (_isLoadingTextures)
+                return;
+
+            // Calculate delta time
+            float deltaTime = (float)args.Timing.ElapsedTime.TotalSeconds;
 
             // Cap delta time to avoid large jumps
             if (deltaTime > 0.1f)
@@ -310,14 +356,67 @@ namespace GORE.UI
             // Update player movement
             UpdatePlayerMovement(deltaTime);
 
-            // Render frame
-            _renderer.Render();
-
             // Update HUD (less frequently to save performance)
             _frameCount++;
             if (_frameCount % 5 == 0) // Update HUD every 5 frames
             {
                 UpdateHUD();
+            }
+        }
+
+        private async System.Threading.Tasks.Task LoadTexturesAsync(CanvasDevice device)
+        {
+            try
+            {
+                if (_pendingTextureMapping == null)
+                {
+                    _isLoadingTextures = false;
+                    return;
+                }
+
+                System.Diagnostics.Debug.WriteLine($"Loading {_pendingTextureMapping.Count} textures...");
+
+                foreach (var texMapping in _pendingTextureMapping)
+                {
+                    try
+                    {
+                        await _renderer.LoadTextureAsync(texMapping.Key, texMapping.Value, device);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Warning: Failed to load texture {texMapping.Value}: {ex.Message}");
+                    }
+                }
+
+                _pendingTextureMapping = null;
+                _isLoadingTextures = false;
+                System.Diagnostics.Debug.WriteLine("✓ All textures loaded");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error loading textures: {ex.Message}");
+                _isLoadingTextures = false;
+            }
+        }
+
+        private void ViewportCanvas_Draw(ICanvasAnimatedControl sender, CanvasAnimatedDrawEventArgs args)
+        {
+            // Don't render if resources aren't initialized or textures are still loading
+            if (_renderer == null || _renderer.GetRenderTarget() == null || _isLoadingTextures)
+            {
+                // Draw loading screen
+                args.DrawingSession.Clear(Windows.UI.Color.FromArgb(255, 0, 0, 0));
+                return;
+            }
+
+            try
+            {
+                // Render the 3D scene, scaled to fill the canvas
+                _renderer.Render(args.DrawingSession, (float)sender.Size.Width, (float)sender.Size.Height);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Render error: {ex.Message}");
             }
         }
 
@@ -361,26 +460,30 @@ namespace GORE.UI
 
         private void UpdateHUD()
         {
-            // Quake 3 style - just the numbers
-            HealthText.Text = _health.ToString();
-            AmmoText.Text = _ammo.ToString();
-
-            // Update FPS counter based on config
-            bool showFps = _config.GetValue("r_showfps", true);
-            FpsText.Visibility = showFps ? Visibility.Visible : Visibility.Collapsed;
-
-            if (showFps)
+            // Marshal UI updates to UI thread
+            DispatcherQueue.TryEnqueue(() =>
             {
-                _frameCount++;
-                var elapsed = (DateTime.Now - _lastFpsUpdate).TotalSeconds;
-                if (elapsed >= 1.0)
+                // Quake 3 style - just the numbers
+                HealthText.Text = _health.ToString();
+                AmmoText.Text = _ammo.ToString();
+
+                // Update FPS counter based on config
+                bool showFps = _config.GetValue("r_showfps", true);
+                FpsText.Visibility = showFps ? Visibility.Visible : Visibility.Collapsed;
+
+                if (showFps)
                 {
-                    var fps = (int)(_frameCount / elapsed);
-                    FpsText.Text = $"{fps}fps";
-                    _frameCount = 0;
-                    _lastFpsUpdate = DateTime.Now;
+                    _frameCount++;
+                    var elapsed = (DateTime.Now - _lastFpsUpdate).TotalSeconds;
+                    if (elapsed >= 1.0)
+                    {
+                        var fps = (int)(_frameCount / elapsed);
+                        FpsText.Text = $"{fps}fps";
+                        _frameCount = 0;
+                        _lastFpsUpdate = DateTime.Now;
+                    }
                 }
-            }
+            });
         }
 
         private void RootGrid_KeyDown(object sender, KeyRoutedEventArgs e)
@@ -548,10 +651,12 @@ namespace GORE.UI
                         else
                         {
                             _isGameLoopRunning = false;
-                            CompositionTarget.Rendering -= OnRendering;
 
                             // Save config on exit
                             _config?.SaveConfig();
+
+                            // Dispose renderer
+                            _renderer?.Dispose();
 
                             Close();
                         }
