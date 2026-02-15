@@ -232,45 +232,7 @@ namespace GORE.UI
 
         private void UpdateLocationDisplay()
         {
-            if (tileMapRenderer != null)
-            {
-                var pos = tileMapRenderer.PlayerPosition;
-                CoordinatesText.Text = $"X: {(int)pos.X}, Y: {(int)pos.Y}";
-
-                int terrain = tileMapRenderer.GetTerrainAt((int)pos.X, (int)pos.Y);
-                string[] terrainNames = { "Ocean", "Grass", "Forest", "Mountain", "Desert", "Snow" };
-                if (terrain >= 0 && terrain < terrainNames.Length)
-                {
-                    // Check if we're at a location from the JSON
-                    string locationName = terrainNames[terrain];
-                    if (worldMap != null && worldMap.Locations != null)
-                    {
-                        foreach (var loc in worldMap.Locations)
-                        {
-                            if (Math.Abs(loc.X - (int)pos.X) <= 1 && Math.Abs(loc.Y - (int)pos.Y) <= 1)
-                            {
-                                locationName = loc.Name;
-                                break;
-                            }
-                        }
-                    }
-                    LocationText.Text = locationName;
-                }
-            }
-
-            if (player != null)
-            {
-                PartyLeaderText.Text = player.Name;
-            }
-
-            StepsText.Text = $"Steps: {steps}";
-
-            var inputs = new List<string>();
-            if (pendingMoveUp) inputs.Add("↑UP");
-            if (pendingMoveDown) inputs.Add("↓DOWN");
-            if (pendingMoveLeft) inputs.Add("←LEFT");
-            if (pendingMoveRight) inputs.Add("→RIGHT");
-            InputDebugText.Text = inputs.Count > 0 ? string.Join(" ", inputs) : "---";
+            // Location display removed - pure gameplay view
         }
 
         private void MapCanvas_CreateResources(CanvasControl sender, Microsoft.Graphics.Canvas.UI.CanvasCreateResourcesEventArgs args)
