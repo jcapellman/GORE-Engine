@@ -26,6 +26,7 @@ namespace GORE.UI
         private Dictionary<int, string> _pendingTextureMapping;
         private bool _isLoadingTextures;
         private bool _resourcesInitialized;
+        private System.Text.StringBuilder _initLog;
 
         private bool _moveForward;
         private bool _moveBackward;
@@ -58,106 +59,185 @@ namespace GORE.UI
         public GameWindow()
         {
             InitializeComponent();
-            InitializeConfig();
-            InitializeConsole();
-            _ = InitializeGameAsync();
+            _initLog = new System.Text.StringBuilder();
+
+            // Start initialization sequence
+            _ = RunInitializationSequenceAsync();
         }
 
-        private void InitializeConfig()
+        private async System.Threading.Tasks.Task RunInitializationSequenceAsync()
         {
-            _config = new GameConfig();
-            _config.LoadConfig();
-
-            // Cache frequently accessed config values
-            UpdateCachedConfigValues();
-
-            // Subscribe to important config changes
-            var renderWidthVar = _config.Get("r_width");
-            var renderHeightVar = _config.Get("r_height");
-            var showFpsVar = _config.Get("r_showfps");
-            var mouseSensitivityVar = _config.Get("m_sensitivity");
-
-            renderWidthVar.OnChanged += OnRenderResolutionChanged;
-            renderHeightVar.OnChanged += OnRenderResolutionChanged;
-            showFpsVar.OnChanged += OnConfigChanged;
-            mouseSensitivityVar.OnChanged += OnConfigChanged;
-        }
-
-        private void UpdateCachedConfigValues()
-        {
-            _showFps = _config.GetValue("r_showfps", true);
-            _mouseSensitivity = _config.GetValue("m_sensitivity", 0.002f);
-        }
-
-        private void OnConfigChanged(ConfigVariable variable)
-        {
-            UpdateCachedConfigValues();
-        }
-
-        private void OnRenderResolutionChanged(ConfigVariable variable)
-        {
-            // Resolution change will require renderer recreation
-            _console?.AddToHistory($"{variable.Name} changed to {variable}");
-            _console?.AddToHistory("Resolution changes will take effect on map reload");
-        }
-
-        private void InitializeConsole()
-        {
-            _console = new GameConsole();
-            _console.SetConfig(_config);
-            _console.OnHistoryChanged += UpdateConsoleDisplay;
-            _console.AddToHistory("GORE Engine Console");
-            _console.AddToHistory("Type 'help' for available commands");
-            _console.AddToHistory("Type 'cvarlist' to see config variables");
-            _console.AddToHistory("");
-        }
-
-        private async System.Threading.Tasks.Task InitializeGameAsync()
-        {
-            ExtendsContentIntoTitleBar = true;
-            ScreenHelper.EnterFullScreenMode(this);
-
-            // Load custom font
-            await LoadCustomFontAsync();
-
-            // Load map from file
-            var baseDirectory = AppContext.BaseDirectory;
-            var mapPath = System.IO.Path.Combine(baseDirectory, "gt1", "maps", "e1m1.map");
-            var textureCfgPath = System.IO.Path.Combine(baseDirectory, "gt1", "maps", "textures.cfg");
-
-            MapData mapData;
             try
             {
-                mapData = await MapLoader.LoadMapAsync(mapPath, textureCfgPath);
-                System.Diagnostics.Debug.WriteLine("✓ Map loaded successfully");
+                ExtendsContentIntoTitleBar = true;
+                ScreenHelper.EnterFullScreenMode(this);
+
+                // Ensure init screen is visible
+                InitScreen.Visibility = Visibility.Visible;
+
+                await System.Threading.Tasks.Task.Delay(100); // Let UI render
+
+                // Initialize Config
+                LogInit("Initializing configuration system...");
+                InitializeConfig();
+                LogInit($"  Config loaded from: {Path.Combine(AppContext.BaseDirectory, "config.json")}");
+
+                // Initialize Console
+                LogInit("Initializing game console...");
+                InitializeConsole();
+                LogInit("  Console ready");
+
+                // Check directories
+                LogInit("Checking game directories...");
+                var baseDirectory = AppContext.BaseDirectory;
+                CheckDirectory(Path.Combine(baseDirectory, "gt1"));
+                CheckDirectory(Path.Combine(baseDirectory, "gt1", "maps"));
+                CheckDirectory(Path.Combine(baseDirectory, "gt1", "textures"));
+
+                // Load custom font
+                LogInit("Loading custom font...");
+                await LoadCustomFontAsync();
+
+                // Initialize map
+                LogInit("Loading initial map...");
+                var mapPath = Path.Combine(baseDirectory, "gt1", "maps", "e1m1.map");
+                var textureCfgPath = Path.Combine(baseDirectory, "gt1", "maps", "textures.cfg");
+
+                MapData mapData;
+                try
+                {
+                    mapData = await MapLoader.LoadMapAsync(mapPath, textureCfgPath);
+                    LogInit($"  Map: {mapData.Name}");
+                    LogInit($"  Dimensions: {mapData.Width}x{mapData.Height}");
+                    LogInit($"  Textures defined: {mapData.TextureMapping.Count}");
+                }
+                catch (Exception ex)
+                {
+                    LogInit($"ERROR: Failed to load map - {ex.Message}");
+                    LogInit("FATAL: Cannot start without valid map");
+                    await System.Threading.Tasks.Task.Delay(3000);
+                    Close();
+                    return;
+                }
+
+                // Verify all texture files exist
+                LogInit("Verifying texture files...");
+                var missingTextures = new List<string>();
+                foreach (var texMapping in mapData.TextureMapping)
+                {
+                    var texturePath = Path.Combine(baseDirectory, texMapping.Value);
+                    if (!File.Exists(texturePath))
+                    {
+                        missingTextures.Add($"  Texture {texMapping.Key}: {texMapping.Value}");
+                    }
+                    else
+                    {
+                        LogInit($"  Texture {texMapping.Key}: {texMapping.Value} - OK");
+                    }
+                }
+
+                if (missingTextures.Count > 0)
+                {
+                    LogInit("");
+                    LogInit("ERROR: Missing required texture files:");
+                    foreach (var missing in missingTextures)
+                    {
+                        LogInit(missing);
+                    }
+                    LogInit("");
+                    LogInit("FATAL: Cannot start with missing textures");
+                    await System.Threading.Tasks.Task.Delay(3000);
+                    Close();
+                    return;
+                }
+
+                // Initialize raycasting engine
+                LogInit("Initializing raycasting engine...");
+                _raycastEngine = new RaycastEngine(mapData.Grid);
+                _raycastEngine.PlayerPosition = mapData.PlayerStart;
+                LogInit($"  Player spawned at ({mapData.PlayerStart.X:F2}, {mapData.PlayerStart.Y:F2})");
+
+                // Initialize renderer
+                LogInit("Initializing 3D renderer...");
+                int renderWidth = _config.GetValue("r_width", 640);
+                int renderHeight = _config.GetValue("r_height", 480);
+                _renderer = new Renderer3D(renderWidth, renderHeight, _raycastEngine);
+                LogInit($"  Resolution: {renderWidth}x{renderHeight}");
+                LogInit("  Win2D hardware acceleration enabled");
+
+                // Store texture mapping for later
+                _pendingTextureMapping = mapData.TextureMapping;
+
+                // Register console commands
+                LogInit("Registering console commands...");
+                RegisterConsoleCommands();
+                LogInit("  Commands registered");
+
+                // Setup frame timer
+                _frameTimer = Stopwatch.StartNew();
+                _isGameLoopRunning = true;
+
+                LogInit("");
+                LogInit("Initialization complete!");
+                LogInit("");
+                LogInit("Press ~ to open console");
+                LogInit("Type 'help' for available commands");
+                LogInit("");
+
+                // Pause for effect (BUILD engine style)
+                await System.Threading.Tasks.Task.Delay(1000);
+
+                // Hide init screen and show game
+                InitScreen.Visibility = Visibility.Collapsed;
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"✗ Failed to load map: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine("Using default map");
-                mapData = MapLoader.CreateDefaultMap();
+                LogInit("");
+                LogInit($"FATAL ERROR: {ex.Message}");
+                LogInit("");
+                LogInit("Press ESC or close window to exit");
+                System.Diagnostics.Debug.WriteLine($"Initialization failed: {ex}");
+                await System.Threading.Tasks.Task.Delay(5000);
+                Close();
+            }
+        }
+
+        private void LogInit(string message)
+        {
+            _initLog.AppendLine(message);
+
+            // Update UI on UI thread
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                InitMessages.Text = _initLog.ToString();
+            });
+
+            // Also add to console if it's initialized
+            if (_console != null)
+            {
+                _console.AddToHistory(message);
             }
 
-            // Initialize raycasting engine
-            _raycastEngine = new RaycastEngine(mapData.Grid);
-            _raycastEngine.PlayerPosition = mapData.PlayerStart;
+            System.Diagnostics.Debug.WriteLine(message);
+        }
 
-            // Initialize renderer with resolution from config
-            int renderWidth = _config.GetValue("r_width", 640);
-            int renderHeight = _config.GetValue("r_height", 480);
+        private void CheckDirectory(string path)
+        {
+            if (Directory.Exists(path))
+            {
+                LogInit($"  {path} - OK");
+            }
+            else
+            {
+                LogInit($"  {path} - NOT FOUND");
+            }
+        }
 
-            _renderer = new Renderer3D(renderWidth, renderHeight, _raycastEngine);
-
-            _console.AddToHistory($"Renderer initialized at {renderWidth}x{renderHeight}");
-            _console.AddToHistory("Win2D hardware acceleration enabled");
-
-            // Note: Textures will be loaded when Win2D canvas is ready
-            // Store texture mapping for later
-            _pendingTextureMapping = mapData.TextureMapping;
-
+        private void RegisterConsoleCommands()
+        {
             // Register game-specific console commands
-            _console.RegisterGameCommands(_raycastEngine, 
-                health => _health = health, 
+            _console.RegisterGameCommands(_raycastEngine,
+                health => _health = health,
                 ammo => _ammo = ammo);
 
             // Register map loading command
@@ -209,10 +289,51 @@ namespace GORE.UI
                     _console.AddToHistory($"Error listing maps: {ex.Message}");
                 }
             });
+        }
 
-            // Setup frame timer
-            _frameTimer = Stopwatch.StartNew();
-            _isGameLoopRunning = true;
+        private void InitializeConfig()
+        {
+            _config = new GameConfig();
+            _config.LoadConfig();
+
+            // Cache frequently accessed config values
+            UpdateCachedConfigValues();
+
+            // Subscribe to important config changes
+            var renderWidthVar = _config.Get("r_width");
+            var renderHeightVar = _config.Get("r_height");
+            var showFpsVar = _config.Get("r_showfps");
+            var mouseSensitivityVar = _config.Get("m_sensitivity");
+
+            renderWidthVar.OnChanged += OnRenderResolutionChanged;
+            renderHeightVar.OnChanged += OnRenderResolutionChanged;
+            showFpsVar.OnChanged += OnConfigChanged;
+            mouseSensitivityVar.OnChanged += OnConfigChanged;
+        }
+
+        private void UpdateCachedConfigValues()
+        {
+            _showFps = _config.GetValue("r_showfps", true);
+            _mouseSensitivity = _config.GetValue("m_sensitivity", 0.002f);
+        }
+
+        private void OnConfigChanged(ConfigVariable variable)
+        {
+            UpdateCachedConfigValues();
+        }
+
+        private void OnRenderResolutionChanged(ConfigVariable variable)
+        {
+            // Resolution change will require renderer recreation
+            _console?.AddToHistory($"{variable.Name} changed to {variable}");
+            _console?.AddToHistory("Resolution changes will take effect on map reload");
+        }
+
+        private void InitializeConsole()
+        {
+            _console = new GameConsole();
+            _console.SetConfig(_config);
+            _console.OnHistoryChanged += UpdateConsoleDisplay;
         }
 
         private async System.Threading.Tasks.Task LoadCustomFontAsync()
@@ -230,16 +351,16 @@ namespace GORE.UI
                     HealthText.FontFamily = fontFamily;
                     AmmoText.FontFamily = fontFamily;
 
-                    System.Diagnostics.Debug.WriteLine($"✓ Custom font loaded: {fontPath}");
+                    LogInit($"  Custom font loaded from: {fontPath}");
                 }
                 else
                 {
-                    System.Diagnostics.Debug.WriteLine($"✗ Font not found: {fontPath} - using default");
+                    LogInit($"  Font not found: {fontPath} - using default");
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"✗ Failed to load custom font: {ex.Message}");
+                LogInit($"  Failed to load custom font: {ex.Message}");
             }
 
             await System.Threading.Tasks.Task.CompletedTask;
@@ -273,6 +394,33 @@ namespace GORE.UI
                     return;
                 }
 
+                // Verify all texture files exist BEFORE loading
+                _console.AddToHistory("Verifying textures...");
+                var missingTextures = new List<string>();
+                foreach (var texMapping in mapData.TextureMapping)
+                {
+                    var texturePath = Path.Combine(baseDirectory, texMapping.Value);
+                    if (!File.Exists(texturePath))
+                    {
+                        missingTextures.Add($"  Texture {texMapping.Key}: {texMapping.Value}");
+                    }
+                }
+
+                if (missingTextures.Count > 0)
+                {
+                    _console.AddToHistory("");
+                    _console.AddToHistory("✗ ERROR: Missing required texture files:");
+                    foreach (var missing in missingTextures)
+                    {
+                        _console.AddToHistory(missing);
+                    }
+                    _console.AddToHistory("");
+                    _console.AddToHistory("Map load aborted");
+                    return;
+                }
+
+                _console.AddToHistory($"  All {mapData.TextureMapping.Count} textures verified");
+
                 // Stop the game loop temporarily
                 var wasRunning = _isGameLoopRunning;
                 _isGameLoopRunning = false;
@@ -300,6 +448,7 @@ namespace GORE.UI
                     _resourcesInitialized = true;
 
                     // Load textures for the new map
+                    _console.AddToHistory("Loading textures...");
                     _isLoadingTextures = true;
                     foreach (var texMapping in mapData.TextureMapping)
                     {
@@ -309,10 +458,14 @@ namespace GORE.UI
                         }
                         catch (Exception ex)
                         {
-                            _console.AddToHistory($"  Warning: Failed to load texture {texMapping.Value}: {ex.Message}");
+                            _console.AddToHistory($"  ✗ FATAL: Failed to load texture {texMapping.Value}: {ex.Message}");
+                            _console.AddToHistory("Map load aborted");
+                            _isLoadingTextures = false;
+                            return;
                         }
                     }
                     _isLoadingTextures = false;
+                    _console.AddToHistory($"  ✓ Loaded {mapData.TextureMapping.Count} textures");
                 }
                 else
                 {
@@ -422,7 +575,23 @@ namespace GORE.UI
                     }
                     catch (Exception ex)
                     {
-                        System.Diagnostics.Debug.WriteLine($"Warning: Failed to load texture {texMapping.Value}: {ex.Message}");
+                        System.Diagnostics.Debug.WriteLine($"FATAL: Failed to load texture {texMapping.Value}: {ex.Message}");
+                        _isLoadingTextures = false;
+                        _isGameLoopRunning = false;
+
+                        // Show error on init screen if still visible
+                        DispatcherQueue.TryEnqueue(() =>
+                        {
+                            LogInit("");
+                            LogInit($"FATAL ERROR: Failed to load texture {texMapping.Value}");
+                            LogInit($"  {ex.Message}");
+                            LogInit("");
+                            LogInit("Cannot continue - missing required texture");
+                        });
+
+                        await System.Threading.Tasks.Task.Delay(3000);
+                        Close();
+                        return;
                     }
                 }
 
@@ -434,6 +603,17 @@ namespace GORE.UI
             {
                 System.Diagnostics.Debug.WriteLine($"Error loading textures: {ex.Message}");
                 _isLoadingTextures = false;
+                _isGameLoopRunning = false;
+
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    LogInit("");
+                    LogInit($"FATAL ERROR: Texture loading failed");
+                    LogInit($"  {ex.Message}");
+                });
+
+                await System.Threading.Tasks.Task.Delay(3000);
+                Close();
             }
         }
 

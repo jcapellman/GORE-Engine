@@ -22,19 +22,6 @@ namespace GORE.Engine
         private CanvasRenderTarget _renderTarget;
         private readonly Dictionary<int, CanvasBitmap> _textures = new();
 
-        // Fallback color palette for walls without textures
-        private readonly Color[] _wallColors = new[]
-        {
-            Color.FromArgb(255, 100, 100, 100),  // 0 = empty
-            Color.FromArgb(255, 255, 0, 0),      // 1 = red
-            Color.FromArgb(255, 0, 255, 0),      // 2 = green
-            Color.FromArgb(255, 0, 0, 255),      // 3 = blue
-            Color.FromArgb(255, 255, 255, 0),    // 4 = yellow
-            Color.FromArgb(255, 255, 0, 255),    // 5 = magenta
-            Color.FromArgb(255, 0, 255, 255),    // 6 = cyan
-            Color.FromArgb(255, 255, 255, 255),  // 7 = white
-        };
-
         public Renderer3D(int width, int height, RaycastEngine raycastEngine)
         {
             _screenWidth = width;
@@ -51,26 +38,29 @@ namespace GORE.Engine
 
         public async Task LoadTextureAsync(int textureId, string texturePath, CanvasDevice device)
         {
+            var baseDirectory = AppContext.BaseDirectory;
+            var fullPath = Path.Combine(baseDirectory, texturePath);
+
+            if (!File.Exists(fullPath))
+            {
+                throw new FileNotFoundException($"Texture file not found: {fullPath}");
+            }
+
             try
             {
-                var baseDirectory = AppContext.BaseDirectory;
-                var fullPath = Path.Combine(baseDirectory, texturePath);
-
-                if (!File.Exists(fullPath))
-                {
-                    System.Diagnostics.Debug.WriteLine($"Texture not found: {fullPath}");
-                    return;
-                }
-
                 var fileStream = File.OpenRead(fullPath);
                 var canvasBitmap = await CanvasBitmap.LoadAsync(device, fileStream.AsRandomAccessStream());
 
                 _textures[textureId] = canvasBitmap;
                 System.Diagnostics.Debug.WriteLine($"✓ Loaded texture {textureId}: {texturePath} ({canvasBitmap.SizeInPixels.Width}x{canvasBitmap.SizeInPixels.Height})");
             }
+            catch (FileNotFoundException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"✗ Failed to load texture {textureId}: {ex.Message}");
+                throw new Exception($"Failed to load texture {textureId} from {texturePath}: {ex.Message}", ex);
             }
         }
 
@@ -104,27 +94,13 @@ namespace GORE.Engine
                     int drawStart = Math.Max(0, -lineHeight / 2 + _screenHeight / 2);
                     int drawEnd = Math.Min(_screenHeight - 1, lineHeight / 2 + _screenHeight / 2);
 
-                    // Draw textured wall if texture exists, otherwise use solid color
-                    if (_textures.ContainsKey(hit.WallType))
+                    // Draw textured wall - throw error if texture is missing
+                    if (!_textures.ContainsKey(hit.WallType))
                     {
-                        DrawTexturedWallWin2D(ds, x, drawStart, drawEnd, hit);
+                        throw new InvalidOperationException($"Missing texture for wall type {hit.WallType}. All textures must be loaded before rendering.");
                     }
-                    else
-                    {
-                        // Fallback to solid color
-                        Color wallColor = _wallColors[Math.Min(hit.WallType, _wallColors.Length - 1)];
 
-                        // Darken color for side walls (create depth effect)
-                        if (hit.Side == 1)
-                        {
-                            wallColor = Color.FromArgb(255,
-                                (byte)(wallColor.R / 2),
-                                (byte)(wallColor.G / 2),
-                                (byte)(wallColor.B / 2));
-                        }
-
-                        ds.DrawLine(x, drawStart, x, drawEnd, wallColor);
-                    }
+                    DrawTexturedWallWin2D(ds, x, drawStart, drawEnd, hit);
                 }
             }
 

@@ -137,5 +137,42 @@
                 </Grid>
             </Border>
         </Grid>
+
+        <!-- BUILD Engine Style Initialization Screen -->
+        <Grid x:Name="InitScreen" 
+              Background="#FF000000"
+              Visibility="Visible">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Red Header Bar -->
+            <Border Grid.Row="0" 
+                    Background="#CC0000"
+                    Padding="0,20">
+                <TextBlock x:Name="InitHeader"
+                          Text="GORE ENGINE v1.0"
+                          FontFamily="Consolas"
+                          FontSize="32"
+                          FontWeight="Bold"
+                          Foreground="White"
+                          HorizontalAlignment="Center"
+                          TextAlignment="Center"/>
+            </Border>
+
+            <!-- Black Background for Messages -->
+            <ScrollViewer Grid.Row="1" 
+                         VerticalScrollBarVisibility="Auto"
+                         Padding="20,30,20,20"
+                         Background="#FF000000">
+                <TextBlock x:Name="InitMessages"
+                          FontFamily="Consolas"
+                          FontSize="16"
+                          Foreground="White"
+                          LineHeight="24"
+                          TextWrapping="Wrap"/>
+            </ScrollViewer>
+        </Grid>
     </Grid>
 </Window>
