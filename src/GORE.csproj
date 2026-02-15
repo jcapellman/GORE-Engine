@@ -8,6 +8,13 @@
     <EnableMsixTooling>true</EnableMsixTooling>
   </PropertyGroup>
   <ItemGroup>
+    <Page Remove="UI\BattleResultScreen.xaml" />
+    <Page Remove="UI\BattleScreen.xaml" />
+    <Page Remove="UI\SplashScreen.xaml" />
+    <Page Remove="UI\WorldMapScreen.xaml" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="Assets\LogoAlt1.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Link>Assets\LogoAlt1.png</Link>
@@ -32,20 +39,10 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.5.240802000" />
-    <PackageReference Include="Microsoft.Graphics.Win2D" Version="1.2.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="UI\BattleResultScreen.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </None>
-    <None Update="UI\BattleScreen.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </None>
-    <None Update="UI\MainMenuScreen.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </None>
-    <None Update="UI\WorldMapScreen.xaml">
+    <None Update="UI\GameWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
     </None>
   </ItemGroup>
