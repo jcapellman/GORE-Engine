@@ -40,11 +40,20 @@ namespace GORE.UI
 
         // FPS tracking
         private int _frameCount = 0;
-        private DateTime _lastFpsUpdate = DateTime.Now;
+        private double _fpsAccumulator = 0.0;
+        private int _fpsFrameCount = 0;
+        private int _lastFps = 0;
 
         // Delta time smoothing
         private float _lastDeltaTime = 0.016f;
         private const float MAX_DELTA_TIME = 0.05f; // Cap at 50ms (20 FPS minimum)
+
+        // Cached config values (updated when config changes)
+        private bool _showFps = true;
+        private float _mouseSensitivity = 0.002f;
+
+        // Cached vectors to reduce allocations
+        private Vector2 _cachedRightVector;
 
         public GameWindow()
         {
@@ -59,12 +68,30 @@ namespace GORE.UI
             _config = new GameConfig();
             _config.LoadConfig();
 
+            // Cache frequently accessed config values
+            UpdateCachedConfigValues();
+
             // Subscribe to important config changes
             var renderWidthVar = _config.Get("r_width");
             var renderHeightVar = _config.Get("r_height");
+            var showFpsVar = _config.Get("r_showfps");
+            var mouseSensitivityVar = _config.Get("m_sensitivity");
 
             renderWidthVar.OnChanged += OnRenderResolutionChanged;
             renderHeightVar.OnChanged += OnRenderResolutionChanged;
+            showFpsVar.OnChanged += OnConfigChanged;
+            mouseSensitivityVar.OnChanged += OnConfigChanged;
+        }
+
+        private void UpdateCachedConfigValues()
+        {
+            _showFps = _config.GetValue("r_showfps", true);
+            _mouseSensitivity = _config.GetValue("m_sensitivity", 0.002f);
+        }
+
+        private void OnConfigChanged(ConfigVariable variable)
+        {
+            UpdateCachedConfigValues();
         }
 
         private void OnRenderResolutionChanged(ConfigVariable variable)
@@ -363,6 +390,9 @@ namespace GORE.UI
             // Update player movement
             UpdatePlayerMovement(deltaTime);
 
+            // Update FPS counter
+            UpdateFPS(deltaTime);
+
             // Update HUD (less frequently to save performance)
             if (_frameCount % 5 == 0) // Update HUD every 5 frames
             {
@@ -431,39 +461,70 @@ namespace GORE.UI
         private void UpdatePlayerMovement(float deltaTime)
         {
             Vector2 movement = Vector2.Zero;
+            bool needsMovement = false;
 
             // Forward/Backward
             if (_moveForward)
+            {
                 movement += _raycastEngine.PlayerDirection;
+                needsMovement = true;
+            }
             if (_moveBackward)
+            {
                 movement -= _raycastEngine.PlayerDirection;
-
-            // Strafing
-            if (_strafeLeft)
-            {
-                Vector2 right = new Vector2(_raycastEngine.PlayerDirection.Y, -_raycastEngine.PlayerDirection.X);
-                movement -= right;
-            }
-            if (_strafeRight)
-            {
-                Vector2 right = new Vector2(_raycastEngine.PlayerDirection.Y, -_raycastEngine.PlayerDirection.X);
-                movement += right;
+                needsMovement = true;
             }
 
-            // Apply movement
-            if (movement != Vector2.Zero)
+            // Strafing - cache the right vector to avoid duplicate calculations
+            if (_strafeLeft || _strafeRight)
+            {
+                _cachedRightVector = new Vector2(_raycastEngine.PlayerDirection.Y, -_raycastEngine.PlayerDirection.X);
+
+                if (_strafeLeft)
+                {
+                    movement -= _cachedRightVector;
+                    needsMovement = true;
+                }
+                if (_strafeRight)
+                {
+                    movement += _cachedRightVector;
+                    needsMovement = true;
+                }
+            }
+
+            // Apply movement only if needed
+            if (needsMovement)
             {
                 movement = Vector2.Normalize(movement);
                 _raycastEngine.MovePlayer(movement, deltaTime);
             }
 
-            // Rotation
-            float mouseSensitivity = _config.GetValue("m_sensitivity", 0.002f);
-            float rotSpeed = 2.0f * deltaTime;
-            if (_turnLeft)
-                _raycastEngine.RotatePlayer(rotSpeed);
-            if (_turnRight)
-                _raycastEngine.RotatePlayer(-rotSpeed);
+            // Rotation - use cached sensitivity
+            if (_turnLeft || _turnRight)
+            {
+                float rotSpeed = 2.0f * deltaTime;
+                if (_turnLeft)
+                    _raycastEngine.RotatePlayer(rotSpeed);
+                if (_turnRight)
+                    _raycastEngine.RotatePlayer(-rotSpeed);
+            }
+        }
+
+        private void UpdateFPS(float deltaTime)
+        {
+            if (_showFps)
+            {
+                _fpsFrameCount++;
+                _fpsAccumulator += deltaTime;
+
+                // Update FPS display once per second
+                if (_fpsAccumulator >= 1.0)
+                {
+                    _lastFps = (int)(_fpsFrameCount / _fpsAccumulator);
+                    _fpsFrameCount = 0;
+                    _fpsAccumulator = 0.0;
+                }
+            }
         }
 
         private void UpdateHUD()
@@ -475,21 +536,12 @@ namespace GORE.UI
                 HealthText.Text = _health.ToString();
                 AmmoText.Text = _ammo.ToString();
 
-                // Update FPS counter based on config
-                bool showFps = _config.GetValue("r_showfps", true);
-                FpsText.Visibility = showFps ? Visibility.Visible : Visibility.Collapsed;
+                // Update FPS counter based on cached config
+                FpsText.Visibility = _showFps ? Visibility.Visible : Visibility.Collapsed;
 
-                if (showFps)
+                if (_showFps && _lastFps > 0)
                 {
-                    _frameCount++;
-                    var elapsed = (DateTime.Now - _lastFpsUpdate).TotalSeconds;
-                    if (elapsed >= 1.0)
-                    {
-                        var fps = (int)(_frameCount / elapsed);
-                        FpsText.Text = $"{fps}fps";
-                        _frameCount = 0;
-                        _lastFpsUpdate = DateTime.Now;
-                    }
+                    FpsText.Text = $"{_lastFps}fps";
                 }
             });
         }
@@ -675,7 +727,26 @@ namespace GORE.UI
 
         private void UpdateConsoleDisplay()
         {
-            ConsoleHistoryText.Text = string.Join("\n", _console.History);
+            // Use StringBuilder to reduce string allocations
+            var history = _console.History;
+            if (history.Count == 0)
+            {
+                ConsoleHistoryText.Text = string.Empty;
+            }
+            else if (history.Count == 1)
+            {
+                ConsoleHistoryText.Text = history[0];
+            }
+            else
+            {
+                var sb = new System.Text.StringBuilder(history.Count * 50); // Estimate capacity
+                for (int i = 0; i < history.Count; i++)
+                {
+                    if (i > 0) sb.Append('\n');
+                    sb.Append(history[i]);
+                }
+                ConsoleHistoryText.Text = sb.ToString();
+            }
 
             // Auto-scroll to bottom
             ConsoleScrollViewer.UpdateLayout();
