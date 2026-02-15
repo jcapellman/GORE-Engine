@@ -47,7 +47,7 @@ namespace GORE.UI
 
             // Load map from file
             var baseDirectory = AppContext.BaseDirectory;
-            var mapPath = System.IO.Path.Combine(baseDirectory, "gt1", "maps", "level1.map");
+            var mapPath = System.IO.Path.Combine(baseDirectory, "gt1", "maps", "e1m1.map");
             var textureCfgPath = System.IO.Path.Combine(baseDirectory, "gt1", "maps", "textures.cfg");
 
             MapData mapData;
