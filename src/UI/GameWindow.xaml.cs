@@ -42,6 +42,10 @@ namespace GORE.UI
         private int _frameCount = 0;
         private DateTime _lastFpsUpdate = DateTime.Now;
 
+        // Delta time smoothing
+        private float _lastDeltaTime = 0.016f;
+        private const float MAX_DELTA_TIME = 0.05f; // Cap at 50ms (20 FPS minimum)
+
         public GameWindow()
         {
             InitializeComponent();
@@ -346,22 +350,26 @@ namespace GORE.UI
             if (_isLoadingTextures)
                 return;
 
-            // Calculate delta time
-            float deltaTime = (float)args.Timing.ElapsedTime.TotalSeconds;
+            // Calculate delta time with smoothing to prevent warping
+            float rawDeltaTime = (float)args.Timing.ElapsedTime.TotalSeconds;
 
-            // Cap delta time to avoid large jumps
-            if (deltaTime > 0.1f)
-                deltaTime = 0.016f; // Fallback to ~60 FPS
+            // Clamp delta time to reasonable range
+            float clampedDeltaTime = Math.Clamp(rawDeltaTime, 0.001f, MAX_DELTA_TIME);
+
+            // Smooth delta time using exponential moving average to reduce jitter
+            float deltaTime = _lastDeltaTime * 0.7f + clampedDeltaTime * 0.3f;
+            _lastDeltaTime = deltaTime;
 
             // Update player movement
             UpdatePlayerMovement(deltaTime);
 
             // Update HUD (less frequently to save performance)
-            _frameCount++;
             if (_frameCount % 5 == 0) // Update HUD every 5 frames
             {
                 UpdateHUD();
             }
+
+            _frameCount++;
         }
 
         private async System.Threading.Tasks.Task LoadTexturesAsync(CanvasDevice device)
