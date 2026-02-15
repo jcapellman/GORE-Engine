@@ -14,11 +14,11 @@
             HorizontalAlignment="Stretch"
             VerticalAlignment="Stretch"/>
 
-        <!-- Menu Container -->
+        <!-- Menu Container - Center-right aligned, positioned 2/3 down screen -->
         <Grid
-            HorizontalAlignment="Left"
-            VerticalAlignment="Center"
-            Margin="200,0,0,0">
+            HorizontalAlignment="Center"
+            VerticalAlignment="Top"
+            Margin="600,600,0,0">
 
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>

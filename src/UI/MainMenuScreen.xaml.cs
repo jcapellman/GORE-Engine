@@ -228,6 +228,8 @@ namespace GORE.UI
 
         private void Exit_Click(object sender, PointerRoutedEventArgs e)
         {
+            // Show cursor before exiting
+            Engine.GOREEngine.ShowCursor();
             Application.Current.Exit();
         }
     }

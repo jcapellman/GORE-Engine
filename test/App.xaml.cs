@@ -9,6 +9,12 @@ namespace GORETest
         public App()
         {
             InitializeComponent();
+
+            // Show cursor when app exits
+            this.UnhandledException += (sender, e) =>
+            {
+                GORE.Engine.GOREEngine.ShowCursor();
+            };
         }
 
         protected override async void OnLaunched(LaunchActivatedEventArgs args)

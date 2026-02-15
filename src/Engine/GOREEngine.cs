@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.InteropServices;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Windowing;
 using WinRT.Interop;
@@ -13,6 +14,10 @@ namespace GORE.Engine
         private static bool _initialized = false;
         private static Window _mainWindow;
 
+        // Win32 API for cursor visibility
+        [DllImport("user32.dll")]
+        private static extern int ShowCursor(bool bShow);
+
         /// <summary>
         /// Initialize and start the GORE Engine with splash screen.
         /// Call this from your App.xaml.cs OnLaunched method.
@@ -24,6 +29,9 @@ namespace GORE.Engine
 
             _mainWindow = mainWindow;
 
+            // Hide the mouse cursor
+            HideCursor();
+
             // Load game configuration
             var config = await Services.ConfigurationService.LoadConfigurationAsync();
 
@@ -32,7 +40,6 @@ namespace GORE.Engine
 
             // Enter fullscreen and hide cursor
             EnterFullScreenMode();
-            HideCursor();
 
             // Show GORE Engine splash screen
             var splashScreen = new UI.SplashScreen(_mainWindow);
@@ -67,18 +74,18 @@ namespace GORE.Engine
 
         private static void HideCursor()
         {
-            // In WinUI 3, cursor visibility is handled differently
-            // This is a placeholder - WinUI 3 doesn't have direct CoreWindow access
-            // You may need to use Win32 APIs via P/Invoke to hide the cursor
-            // For now, we'll leave this as a no-op or use InputCursor
-            if (_mainWindow != null)
-            {
-                _mainWindow.Activated += (sender, args) =>
-                {
-                    // Set cursor to null to hide it
-                    // Note: This may need platform-specific implementation
-                };
-            }
+            // Hide the cursor using Win32 API
+            ShowCursor(false);
+            System.Diagnostics.Debug.WriteLine("Cursor hidden");
+        }
+
+        /// <summary>
+        /// Shows the mouse cursor (called on app exit)
+        /// </summary>
+        public static void ShowCursor()
+        {
+            ShowCursor(true);
+            System.Diagnostics.Debug.WriteLine("Cursor shown");
         }
 
         /// <summary>
