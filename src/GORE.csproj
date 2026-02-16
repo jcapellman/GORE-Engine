@@ -15,37 +15,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Assets\LogoAlt1.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Link>Assets\LogoAlt1.png</Link>
-    </Content>
-    <Content Include="Assets\LogoAlt2.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Link>Assets\LogoAlt2.png</Link>
-    </Content>
-    <Content Include="Assets\LogoAlt3.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Link>Assets\LogoAlt3.png</Link>
-    </Content>
-    <Content Include="Assets\LogoAlt4.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Link>Assets\LogoAlt4.png</Link>
-    </Content>
-    <Content Include="Assets\LogoAlt5.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Link>Assets\LogoAlt5.png</Link>
-    </Content>
-    <Content Include="..\test\gt1\hud\health.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Link>gt1\hud\health.png</Link>
-    </Content>
-    <Content Include="..\test\gt1\hud\ammo.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <Link>gt1\hud\ammo.png</Link>
-    </Content>
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.6.240923002" />
     <PackageReference Include="Microsoft.Graphics.Win2D" Version="1.3.0" />
   </ItemGroup>
