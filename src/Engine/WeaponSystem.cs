@@ -337,6 +337,15 @@ namespace GORE.Engine
         {
             _frameCount++;
 
+            // If reloading but no ammo left to reload with, cancel reload and go idle
+            if (_animationState == WeaponAnimationState.Reloading && 
+                !CurrentWeapon.InfiniteAmmo && 
+                CurrentWeapon.CurrentAmmo == 0)
+            {
+                _animationState = WeaponAnimationState.Idle;
+                _animationTimer = 0f;
+            }
+
             // Update fire cooldown
             if (_fireTimer > 0f)
             {

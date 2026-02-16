@@ -7,7 +7,7 @@
       "magazine_size": 12,
       "max_ammo": 48,
       "ammo_type": "45acp",
-      "fire_rate": 1.0,
+      "fire_rate": 0.35,
       "sprite_scale": 0.6,
       "infinite_ammo": false,
       "sprites": {
@@ -24,13 +24,13 @@
       "magazine_size": 30,
       "max_ammo": 100,
       "ammo_type": "9mm",
-      "fire_rate": 0.05,
+      "fire_rate": 0.1,
       "sprite_scale": 0.7,
       "infinite_ammo": false,
       "sprites": {
         "idle": "gt1/weapons/vp5_idle.png",
         "fire": "gt1/weapons/vp5_fire.png",
-        "fire_alt": "gt1/weapons/vp5_fire_alt.png",n
+        "fire_alt": "gt1/weapons/vp5_fire_alt.png",
         "reload": "gt1/weapons/vp5_reload.png"
       }
     }
