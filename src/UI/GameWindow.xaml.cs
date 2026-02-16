@@ -56,10 +56,31 @@ namespace GORE.UI
         // Cached vectors to reduce allocations
         private Vector2 _cachedRightVector;
 
+        // Cached HUD strings to reduce allocations
+        private string _cachedHealthText = "100";
+        private string _cachedAmmoText = "50";
+        private string _cachedFpsText = "60fps";
+        private bool _hudNeedsUpdate = true;
+
+        // Cached dispatcher action to avoid lambda allocations
+        private Microsoft.UI.Dispatching.DispatcherQueueHandler _updateHudAction;
+
         public GameWindow()
         {
             InitializeComponent();
             _initLog = new System.Text.StringBuilder();
+
+            // Initialize cached dispatcher action
+            _updateHudAction = () =>
+            {
+                HealthText.Text = _cachedHealthText;
+                AmmoText.Text = _cachedAmmoText;
+                FpsText.Visibility = _showFps ? Visibility.Visible : Visibility.Collapsed;
+                if (_showFps)
+                {
+                    FpsText.Text = _cachedFpsText;
+                }
+            };
 
             // Start initialization sequence
             _ = RunInitializationSequenceAsync();
@@ -742,27 +763,40 @@ namespace GORE.UI
                     _lastFps = (int)(_fpsFrameCount / _fpsAccumulator);
                     _fpsFrameCount = 0;
                     _fpsAccumulator = 0.0;
+
+                    // Cache the FPS string to avoid allocations during HUD update
+                    _cachedFpsText = $"{_lastFps}fps";
+                    _hudNeedsUpdate = true;
                 }
             }
         }
 
         private void UpdateHUD()
         {
-            // Marshal UI updates to UI thread
-            DispatcherQueue.TryEnqueue(() =>
+            // Only update cached strings if values have changed
+            bool healthChanged = false;
+            bool ammoChanged = false;
+
+            var healthStr = _health.ToString();
+            if (_cachedHealthText != healthStr)
             {
-                // Quake 3 style - just the numbers
-                HealthText.Text = _health.ToString();
-                AmmoText.Text = _ammo.ToString();
+                _cachedHealthText = healthStr;
+                healthChanged = true;
+            }
 
-                // Update FPS counter based on cached config
-                FpsText.Visibility = _showFps ? Visibility.Visible : Visibility.Collapsed;
+            var ammoStr = _ammo.ToString();
+            if (_cachedAmmoText != ammoStr)
+            {
+                _cachedAmmoText = ammoStr;
+                ammoChanged = true;
+            }
 
-                if (_showFps && _lastFps > 0)
-                {
-                    FpsText.Text = $"{_lastFps}fps";
-                }
-            });
+            // Only marshal to UI thread if something changed
+            if (healthChanged || ammoChanged || _hudNeedsUpdate)
+            {
+                _hudNeedsUpdate = false;
+                DispatcherQueue.TryEnqueue(_updateHudAction);
+            }
         }
 
         private void RootGrid_KeyDown(object sender, KeyRoutedEventArgs e)
@@ -914,6 +948,7 @@ namespace GORE.UI
                     if (isPressed && _ammo > 0)
                     {
                         _ammo--;
+                        _hudNeedsUpdate = true; // Force HUD update on ammo change
                         // TODO: Implement shooting
                     }
                     break;
@@ -946,6 +981,12 @@ namespace GORE.UI
 
         private void UpdateConsoleDisplay()
         {
+            // Skip update if console is not visible (performance optimization)
+            if (!_consoleVisible && ConsoleOverlay.Visibility != Visibility.Visible)
+            {
+                return;
+            }
+
             // Use StringBuilder to reduce string allocations
             var history = _console.History;
             if (history.Count == 0)
