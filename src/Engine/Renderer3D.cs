@@ -21,6 +21,7 @@ namespace GORE.Engine
         // Win2D resources
         private CanvasRenderTarget _renderTarget;
         private readonly Dictionary<int, CanvasBitmap> _textures = new();
+        private readonly Dictionary<int, TintEffect> _tintEffects = new();
 
         public Renderer3D(int width, int height, RaycastEngine raycastEngine)
         {
@@ -52,6 +53,14 @@ namespace GORE.Engine
                 var canvasBitmap = await CanvasBitmap.LoadAsync(device, fileStream.AsRandomAccessStream());
 
                 _textures[textureId] = canvasBitmap;
+
+                // Pre-create and cache the tint effect for this texture
+                _tintEffects[textureId] = new TintEffect
+                {
+                    Source = canvasBitmap,
+                    Color = Color.FromArgb(255, 128, 128, 128) // 50% brightness for side walls
+                };
+
                 System.Diagnostics.Debug.WriteLine($"✓ Loaded texture {textureId}: {texturePath} ({canvasBitmap.SizeInPixels.Width}x{canvasBitmap.SizeInPixels.Height})");
             }
             catch (FileNotFoundException)
@@ -173,17 +182,12 @@ namespace GORE.Engine
                                 wallHeight
                             );
 
-                            // Apply shading for side walls using a tint effect
+                            // Apply shading for side walls using cached tint effect
                             if (hit.Side == 1)
                             {
-                                using (var tintEffect = new TintEffect
-                                {
-                                    Source = texture,
-                                    Color = Color.FromArgb(255, 128, 128, 128) // 50% brightness
-                                })
-                                {
-                                    ds.DrawImage(tintEffect, destRect, sourceRect);
-                                }
+                                // Use cached tint effect instead of creating new one
+                                var tintEffect = _tintEffects[hit.WallType];
+                                ds.DrawImage(tintEffect, destRect, sourceRect);
                             }
                             else
                             {
@@ -194,6 +198,11 @@ namespace GORE.Engine
                         public void Dispose()
                         {
                             _renderTarget?.Dispose();
+                            foreach (var tintEffect in _tintEffects.Values)
+                            {
+                                tintEffect?.Dispose();
+                            }
+                            _tintEffects.Clear();
                             foreach (var texture in _textures.Values)
                             {
                                 texture?.Dispose();
