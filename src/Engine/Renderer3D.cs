@@ -87,6 +87,17 @@ namespace GORE.Engine
                     if (hit.WallType == 0)
                         continue;
 
+                    // Check if this is a door and get its state
+                    DoorState doorState = null;
+                    if (hit.IsDoor)
+                    {
+                        doorState = _raycastEngine.GetDoorState(hit.MapX, hit.MapY);
+
+                        // If door is fully open, skip rendering it
+                        if (doorState != null && doorState.OpenAmount >= 0.99f)
+                            continue;
+                    }
+
                     // Calculate line height
                     int lineHeight = (int)(_screenHeight / hit.Distance);
 
@@ -100,7 +111,7 @@ namespace GORE.Engine
                         throw new InvalidOperationException($"Missing texture for wall type {hit.WallType}. All textures must be loaded before rendering.");
                     }
 
-                    DrawTexturedWallWin2D(ds, x, drawStart, drawEnd, hit);
+                    DrawTexturedWallWin2D(ds, x, drawStart, drawEnd, hit, doorState);
                 }
             }
 
@@ -109,12 +120,32 @@ namespace GORE.Engine
             drawingSession.DrawImage(_renderTarget, destRect);
         }
 
-                        private void DrawTexturedWallWin2D(CanvasDrawingSession ds, int screenX, int drawStart, int drawEnd, RaycastHit hit)
+                        private void DrawTexturedWallWin2D(CanvasDrawingSession ds, int screenX, int drawStart, int drawEnd, RaycastHit hit, DoorState doorState = null)
                         {
                             var texture = _textures[hit.WallType];
 
                             // Calculate wall X coordinate (0.0 to 1.0)
                             float wallX = hit.WallX;
+
+                            // For doors, offset the texture based on how open the door is
+                            // Doors slide horizontally into the wall pocket (Wolfenstein 3D style)
+                            if (doorState != null)
+                            {
+                                // As door opens (0 to 1), we want to show less of the texture
+                                // OpenAmount 0.0 = fully visible, 1.0 = fully hidden
+
+                                // The door texture slides to the side as it opens
+                                // We reduce the visible portion of the texture
+                                float visiblePortion = 1.0f - doorState.OpenAmount;
+
+                                // Only render if there's something visible
+                                if (visiblePortion <= 0.01f)
+                                    return;
+
+                                // Adjust the texture coordinate to show only the visible portion
+                                // This creates the sliding effect
+                                wallX = wallX * visiblePortion;
+                            }
 
                             // X coordinate on the texture
                             int texX = (int)(wallX * texture.SizeInPixels.Width);

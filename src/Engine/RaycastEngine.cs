@@ -1,13 +1,28 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 
 namespace GORE.Engine
 {
+    public class DoorState
+    {
+        public int MapX { get; set; }
+        public int MapY { get; set; }
+        public float OpenAmount { get; set; } = 0f; // 0 = closed, 1 = fully open
+        public bool IsOpening { get; set; } = false;
+        public bool IsClosing { get; set; } = false;
+        public float CloseTimer { get; set; } = 0f;
+    }
+
     public class RaycastEngine
     {
         private readonly int[,] _worldMap;
         private readonly int _mapWidth;
         private readonly int _mapHeight;
+        private readonly Dictionary<(int, int), DoorState> _doors;
+        private const int DOOR_TEXTURE_ID = 5; // Doors use texture ID 5
+        private const float DOOR_OPEN_SPEED = 2.0f;
+        private const float DOOR_CLOSE_DELAY = 3.0f; // Delay before door starts closing
 
         public Vector2 PlayerPosition { get; set; }
         public Vector2 PlayerDirection { get; set; }
@@ -18,6 +33,27 @@ namespace GORE.Engine
             _worldMap = worldMap;
             _mapHeight = worldMap.GetLength(0);
             _mapWidth = worldMap.GetLength(1);
+            _doors = new Dictionary<(int, int), DoorState>();
+
+            // Find all doors in the map and initialize their state
+            for (int y = 0; y < _mapHeight; y++)
+            {
+                for (int x = 0; x < _mapWidth; x++)
+                {
+                    if (_worldMap[y, x] == DOOR_TEXTURE_ID)
+                    {
+                        _doors[(x, y)] = new DoorState
+                        {
+                            MapX = x,
+                            MapY = y,
+                            OpenAmount = 0f
+                        };
+                        System.Diagnostics.Debug.WriteLine($"Door found at ({x}, {y})");
+                    }
+                }
+            }
+
+            System.Diagnostics.Debug.WriteLine($"Total doors initialized: {_doors.Count}");
 
             // Default player position and direction
             PlayerPosition = new Vector2(2.5f, 2.5f);
@@ -99,8 +135,22 @@ namespace GORE.Engine
                 if (mapX < 0 || mapX >= _mapWidth || mapY < 0 || mapY >= _mapHeight)
                     break;
 
-                if (_worldMap[mapY, mapX] > 0)
+                int cellValue = _worldMap[mapY, mapX];
+
+                // Check if it's a door
+                if (cellValue == DOOR_TEXTURE_ID && _doors.TryGetValue((mapX, mapY), out var doorState))
+                {
+                    // If door is mostly open (>90%), treat as passable
+                    if (doorState.OpenAmount < 0.9f)
+                    {
+                        // Door is closed or partially open, register as hit
+                        hit = true;
+                    }
+                }
+                else if (cellValue > 0)
+                {
                     hit = true;
+                }
             }
 
             // Calculate distance to the wall
@@ -143,7 +193,17 @@ namespace GORE.Engine
 
             if (mapX >= 0 && mapX < _mapWidth && mapY >= 0 && mapY < _mapHeight)
             {
-                if (_worldMap[mapY, mapX] == 0)
+                int cellValue = _worldMap[mapY, mapX];
+
+                // Allow movement through empty cells
+                if (cellValue == 0)
+                {
+                    PlayerPosition = newPos;
+                }
+                // Allow movement through open doors (90% or more open)
+                else if (cellValue == DOOR_TEXTURE_ID && 
+                         _doors.TryGetValue((mapX, mapY), out var doorState) &&
+                         doorState.OpenAmount >= 0.9f)
                 {
                     PlayerPosition = newPos;
                 }
@@ -166,6 +226,133 @@ namespace GORE.Engine
                 oldPlaneX * MathF.Sin(angle) + CameraPlane.Y * MathF.Cos(angle)
             );
         }
+
+        /// <summary>
+        /// Update door states (opening/closing animations)
+        /// </summary>
+        public void UpdateDoors(float deltaTime)
+        {
+            foreach (var door in _doors.Values)
+            {
+                if (door.IsOpening)
+                {
+                    door.OpenAmount += DOOR_OPEN_SPEED * deltaTime;
+                    if (door.OpenAmount >= 1.0f)
+                    {
+                        door.OpenAmount = 1.0f;
+                        door.IsOpening = false;
+                        door.CloseTimer = DOOR_CLOSE_DELAY; // Start close timer
+                    }
+                }
+                else if (door.OpenAmount > 0f && !door.IsOpening)
+                {
+                    // Door is open, wait before closing
+                    door.CloseTimer -= deltaTime;
+
+                    if (door.CloseTimer <= 0f)
+                    {
+                        door.IsClosing = true;
+                    }
+                }
+
+                if (door.IsClosing)
+                {
+                    door.OpenAmount -= DOOR_OPEN_SPEED * deltaTime;
+                    if (door.OpenAmount <= 0f)
+                    {
+                        door.OpenAmount = 0f;
+                        door.IsClosing = false;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Try to interact with a door in front of the player
+        /// </summary>
+        public bool TryInteractWithDoor()
+        {
+            // Check cells around the player within reach distance
+            float reachDistance = 1.5f;
+
+            // First, check the cell directly in front of the player
+            Vector2 checkPos = PlayerPosition + PlayerDirection * reachDistance;
+            int checkX = (int)checkPos.X;
+            int checkY = (int)checkPos.Y;
+
+            // Check the cell in front
+            if (TryActivateDoorAtPosition(checkX, checkY))
+                return true;
+
+            // Also check adjacent cells in case player isn't perfectly aligned
+            // Check player's current cell
+            int playerX = (int)PlayerPosition.X;
+            int playerY = (int)PlayerPosition.Y;
+
+            if (TryActivateDoorAtPosition(playerX, playerY))
+                return true;
+
+            // Check cells in a 3x3 grid around player
+            for (int dy = -1; dy <= 1; dy++)
+            {
+                for (int dx = -1; dx <= 1; dx++)
+                {
+                    int testX = playerX + dx;
+                    int testY = playerY + dy;
+
+                    // Calculate distance to this cell center
+                    Vector2 cellCenter = new Vector2(testX + 0.5f, testY + 0.5f);
+                    float dist = Vector2.Distance(PlayerPosition, cellCenter);
+
+                    if (dist <= reachDistance)
+                    {
+                        if (TryActivateDoorAtPosition(testX, testY))
+                            return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Helper method to try activating a door at a specific position
+        /// </summary>
+        private bool TryActivateDoorAtPosition(int x, int y)
+        {
+            // Check bounds
+            if (x < 0 || x >= _mapWidth || y < 0 || y >= _mapHeight)
+                return false;
+
+            // Check if there's a door at this position
+            if (_worldMap[y, x] == DOOR_TEXTURE_ID &&
+                _doors.TryGetValue((x, y), out var doorState))
+            {
+                // Toggle door state
+                if (doorState.OpenAmount < 0.5f && !doorState.IsOpening)
+                {
+                    // Door is closed or closing, open it
+                    doorState.IsOpening = true;
+                    doorState.IsClosing = false;
+                    System.Diagnostics.Debug.WriteLine($"Door activated at ({x}, {y})");
+                    return true;
+                }
+                // If already open or opening, still return true to indicate a door was found
+                System.Diagnostics.Debug.WriteLine($"Door at ({x}, {y}) already open/opening");
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Get door state for a specific cell (for rendering)
+        /// </summary>
+        public DoorState GetDoorState(int mapX, int mapY)
+        {
+            _doors.TryGetValue((mapX, mapY), out var doorState);
+            return doorState;
+        }
     }
 
     public struct RaycastHit
@@ -178,5 +365,6 @@ namespace GORE.Engine
         public float WallX;
         public float RayDirX;
         public float RayDirY;
+        public bool IsDoor => WallType == 5; // Doors use texture ID 5
     }
 }

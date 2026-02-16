@@ -774,6 +774,9 @@ namespace GORE.UI
             // Update player movement
             UpdatePlayerMovement(deltaTime);
 
+            // Update doors
+            _raycastEngine?.UpdateDoors(deltaTime);
+
             // Handle continuous firing
             if (_fireTriggerHeld)
             {
@@ -1164,9 +1167,28 @@ namespace GORE.UI
                     _turnRight = isPressed;
                     break;
 
-                // Space to shoot
-                case VirtualKey.Space:
+                // Control to shoot
+                case VirtualKey.Control:
                     _fireTriggerHeld = isPressed;
+                    break;
+
+                // Space to open doors/toggle switches
+                case VirtualKey.Space:
+                    if (isPressed)
+                    {
+                        // Try to interact with door
+                        bool doorFound = _raycastEngine?.TryInteractWithDoor() == true;
+
+                        if (doorFound)
+                        {
+                            System.Diagnostics.Debug.WriteLine("Door interaction triggered!");
+                            // Door interaction successful (optional: play sound here)
+                        }
+                        else
+                        {
+                            System.Diagnostics.Debug.WriteLine($"No door found near player at ({_raycastEngine?.PlayerPosition.X:F2}, {_raycastEngine?.PlayerPosition.Y:F2})");
+                        }
+                    }
                     break;
 
                 // R to reload
