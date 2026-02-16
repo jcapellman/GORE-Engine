@@ -117,10 +117,15 @@ namespace GORE.UI
                 CheckDirectory(Path.Combine(baseDirectory, "gt1"));
                 CheckDirectory(Path.Combine(baseDirectory, "gt1", "maps"));
                 CheckDirectory(Path.Combine(baseDirectory, "gt1", "textures"));
+                CheckDirectory(Path.Combine(baseDirectory, "gt1", "hud"));
 
                 // Load custom font
                 LogInit("Loading custom font...");
                 await LoadCustomFontAsync();
+
+                // Load HUD icons
+                LogInit("Loading HUD icons...");
+                await LoadHudIconsAsync();
 
                 // Initialize map
                 LogInit("Loading initial map...");
@@ -532,6 +537,62 @@ namespace GORE.UI
             catch (Exception ex)
             {
                 LogInit($"  Failed to load custom font: {ex.Message}");
+            }
+
+            await System.Threading.Tasks.Task.CompletedTask;
+        }
+
+        private async System.Threading.Tasks.Task LoadHudIconsAsync()
+        {
+            try
+            {
+                var baseDirectory = AppContext.BaseDirectory;
+                var healthIconPath = Path.Combine(baseDirectory, "gt1", "hud", "health.png");
+                var ammoIconPath = Path.Combine(baseDirectory, "gt1", "hud", "ammo.png");
+
+                var missingIcons = new List<string>();
+
+                // Check health icon
+                if (File.Exists(healthIconPath))
+                {
+                    var healthUri = new Uri($"file:///{healthIconPath.Replace("\\", "/")}");
+                    var healthBitmap = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(healthUri);
+                    HealthIcon.Source = healthBitmap;
+                    LogInit($"  Health icon loaded: gt1/hud/health.png");
+                }
+                else
+                {
+                    missingIcons.Add("  gt1/hud/health.png");
+                }
+
+                // Check ammo icon
+                if (File.Exists(ammoIconPath))
+                {
+                    var ammoUri = new Uri($"file:///{ammoIconPath.Replace("\\", "/")}");
+                    var ammoBitmap = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(ammoUri);
+                    AmmoIcon.Source = ammoBitmap;
+                    LogInit($"  Ammo icon loaded: gt1/hud/ammo.png");
+                }
+                else
+                {
+                    missingIcons.Add("  gt1/hud/ammo.png");
+                }
+
+                if (missingIcons.Count > 0)
+                {
+                    LogInit("");
+                    LogInit("WARNING: Missing HUD icon files:");
+                    foreach (var missing in missingIcons)
+                    {
+                        LogInit(missing);
+                    }
+                    LogInit("  HUD will display without icons");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogInit($"  Failed to load HUD icons: {ex.Message}");
+                LogInit("  HUD will display without icons");
             }
 
             await System.Threading.Tasks.Task.CompletedTask;

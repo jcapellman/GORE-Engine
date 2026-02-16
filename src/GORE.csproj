@@ -35,6 +35,14 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Link>Assets\LogoAlt5.png</Link>
     </Content>
+    <Content Include="..\test\gt1\hud\health.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>gt1\hud\health.png</Link>
+    </Content>
+    <Content Include="..\test\gt1\hud\ammo.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>gt1\hud\ammo.png</Link>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

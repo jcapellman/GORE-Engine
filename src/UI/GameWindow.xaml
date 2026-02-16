@@ -19,6 +19,11 @@
                     HorizontalAlignment="Left" 
                     VerticalAlignment="Bottom"
                     Margin="30,0,0,30">
+            <Image x:Name="HealthIcon"
+                   Width="48"
+                   Height="48"
+                   Margin="0,0,10,0"
+                   VerticalAlignment="Center"/>
             <Border Background="#330000" 
                     BorderBrush="#FF0000" 
                     BorderThickness="3" 
@@ -32,13 +37,6 @@
                           FontWeight="Black"
                           VerticalAlignment="Center"/>
             </Border>
-            <TextBlock Text="HEALTH"
-                      Foreground="#888888"
-                      FontFamily="Consolas"
-                      FontSize="16"
-                      FontWeight="Bold"
-                      VerticalAlignment="Center"
-                      Margin="10,0,0,0"/>
         </StackPanel>
 
         <!-- HUD Overlay - Bottom Right (Ammo) -->
@@ -46,13 +44,6 @@
                     HorizontalAlignment="Right" 
                     VerticalAlignment="Bottom"
                     Margin="0,0,30,30">
-            <TextBlock Text="AMMO"
-                      Foreground="#888888"
-                      FontFamily="Consolas"
-                      FontSize="16"
-                      FontWeight="Bold"
-                      VerticalAlignment="Center"
-                      Margin="0,0,10,0"/>
             <Border Background="#331100" 
                     BorderBrush="#FFAA00" 
                     BorderThickness="3" 
@@ -66,6 +57,11 @@
                           FontWeight="Black"
                           VerticalAlignment="Center"/>
             </Border>
+            <Image x:Name="AmmoIcon"
+                   Width="48"
+                   Height="48"
+                   Margin="10,0,0,0"
+                   VerticalAlignment="Center"/>
         </StackPanel>
 
         <!-- FPS Counter - Top Right -->
