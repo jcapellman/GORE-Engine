@@ -34,10 +34,12 @@ namespace GORE.UI
         private bool _strafeRight;
         private bool _turnLeft;
         private bool _turnRight;
+        private bool _fireTriggerHeld;
 
         private Stopwatch _frameTimer;
         private int _health = 100;
         private int _ammo = 50;
+        private WeaponSystem _weaponSystem;
 
         // FPS tracking
         private int _frameCount = 0;
@@ -189,6 +191,12 @@ namespace GORE.UI
                 // Store texture mapping for later
                 _pendingTextureMapping = mapData.TextureMapping;
 
+                // Initialize weapon system
+                LogInit("Initializing weapon system...");
+                _weaponSystem = new WeaponSystem();
+                _weaponSystem.LoadWeaponsConfig(); // Load from gt1/weapons.json
+                LogInit("  Weapons loaded from config");
+
                 // Register console commands
                 LogInit("Registering console commands...");
                 RegisterConsoleCommands();
@@ -308,6 +316,108 @@ namespace GORE.UI
                 catch (Exception ex)
                 {
                     _console.AddToHistory($"Error listing maps: {ex.Message}");
+                }
+            });
+
+            // Register weapon commands
+            _console.RegisterCommand("weapon", "Switch weapon (usage: weapon <0-7>)", args =>
+            {
+                if (args.Length == 0)
+                {
+                    var current = _weaponSystem.CurrentWeapon;
+                    _console.AddToHistory($"Current weapon: [{_weaponSystem.CurrentWeaponIndex}] {current.Name}");
+                    if (current.InfiniteAmmo)
+                    {
+                        _console.AddToHistory($"  Ammo: Infinite");
+                    }
+                    else if (current.MagazineSize > 0)
+                    {
+                        _console.AddToHistory($"  Magazine: {current.MagazineAmmo}/{current.MagazineSize}");
+                        _console.AddToHistory($"  Reserve: {current.CurrentAmmo}/{current.MaxAmmo}");
+                    }
+                    else
+                    {
+                        _console.AddToHistory($"  Ammo: {current.CurrentAmmo}/{current.MaxAmmo}");
+                    }
+                    _console.AddToHistory($"  Damage: {current.DamagePerRound}");
+                    _console.AddToHistory($"  Fire rate: {current.FireRate:F2}s");
+                    _console.AddToHistory($"  Ammo type: {current.AmmoType}");
+                    _console.AddToHistory("Usage: weapon <0-7>");
+                    return;
+                }
+
+                if (int.TryParse(args[0], out int weaponIndex))
+                {
+                    if (_weaponSystem.SwitchToWeapon(weaponIndex))
+                    {
+                        var weapon = _weaponSystem.CurrentWeapon;
+                        _console.AddToHistory($"Switched to: [{weaponIndex}] {weapon.Name}");
+                    }
+                    else
+                    {
+                        _console.AddToHistory($"Invalid weapon index: {weaponIndex} (valid: 0-7)");
+                    }
+                }
+                else
+                {
+                    _console.AddToHistory($"Invalid number: {args[0]}");
+                }
+            });
+
+            _console.RegisterCommand("weapons", "List all weapons", args =>
+            {
+                _console.AddToHistory("Available weapons:");
+                for (int i = 0; i < 8; i++)
+                {
+                    var weapon = _weaponSystem.GetWeapon(i);
+                    if (weapon == null) continue;
+
+                    var marker = (i == _weaponSystem.CurrentWeaponIndex) ? ">" : " ";
+
+                    string ammoStr;
+                    if (weapon.InfiniteAmmo)
+                    {
+                        ammoStr = "∞";
+                    }
+                    else if (weapon.MagazineSize > 0)
+                    {
+                        ammoStr = $"{weapon.MagazineAmmo}/{weapon.MagazineSize} ({weapon.CurrentAmmo})";
+                    }
+                    else
+                    {
+                        ammoStr = $"{weapon.CurrentAmmo}/{weapon.MaxAmmo}";
+                    }
+
+                    _console.AddToHistory($"{marker} [{i}] {weapon.Name} - {ammoStr} - {weapon.DamagePerRound}dmg - {weapon.FireRate:F2}s");
+                }
+            });
+
+            _console.RegisterCommand("giveammo", "Give ammo to weapon (usage: giveammo <weapon> <amount>)", args =>
+            {
+                if (args.Length < 2)
+                {
+                    _console.AddToHistory("Usage: giveammo <weapon> <amount>");
+                    _console.AddToHistory("Example: giveammo 1 50");
+                    return;
+                }
+
+                if (int.TryParse(args[0], out int weaponIndex) && int.TryParse(args[1], out int amount))
+                {
+                    var weapon = _weaponSystem.GetWeapon(weaponIndex);
+                    if (weapon != null)
+                    {
+                        weapon.AddAmmo(amount);
+                        _console.AddToHistory($"Added {amount} ammo to {weapon.Name}");
+                        _console.AddToHistory($"  Ammo: {weapon.CurrentAmmo}/{weapon.MaxAmmo}");
+                    }
+                    else
+                    {
+                        _console.AddToHistory($"Invalid weapon: {weaponIndex}");
+                    }
+                }
+                else
+                {
+                    _console.AddToHistory("Invalid arguments");
                 }
             });
         }
@@ -603,6 +713,25 @@ namespace GORE.UI
             // Update player movement
             UpdatePlayerMovement(deltaTime);
 
+            // Handle continuous firing
+            if (_fireTriggerHeld)
+            {
+                if (_weaponSystem?.TryFire() == true)
+                {
+                    _hudNeedsUpdate = true;
+                    // TODO: Add projectile/hitscan logic here
+                }
+            }
+
+            // Auto-reload when magazine is empty and reserve ammo available
+            if (_weaponSystem?.CurrentWeapon?.NeedsReload() == true)
+            {
+                _weaponSystem.Reload();
+            }
+
+            // Update weapon system
+            _weaponSystem?.Update(deltaTime);
+
             // Update FPS counter
             UpdateFPS(deltaTime);
 
@@ -656,6 +785,12 @@ namespace GORE.UI
                 }
 
                 _pendingTextureMapping = null;
+
+                // Load weapon sprites
+                System.Diagnostics.Debug.WriteLine("Loading weapon sprites...");
+                await _weaponSystem.LoadWeaponSpritesAsync(device);
+                System.Diagnostics.Debug.WriteLine("✓ Weapon sprites loaded");
+
                 _isLoadingTextures = false;
                 System.Diagnostics.Debug.WriteLine("✓ All textures loaded");
             }
@@ -691,6 +826,9 @@ namespace GORE.UI
             {
                 // Render the 3D scene, scaled to fill the canvas
                 _renderer.Render(args.DrawingSession, (float)sender.Size.Width, (float)sender.Size.Height);
+
+                // Render weapon sprite on top
+                _weaponSystem?.Render(args.DrawingSession, (float)sender.Size.Width, (float)sender.Size.Height);
             }
             catch (Exception ex)
             {
@@ -784,7 +922,29 @@ namespace GORE.UI
                 healthChanged = true;
             }
 
-            var ammoStr = _ammo.ToString();
+            // Show current weapon's magazine ammo (or total if no magazine system)
+            string ammoStr;
+            if (_weaponSystem != null)
+            {
+                var weapon = _weaponSystem.CurrentWeapon;
+                if (weapon.InfiniteAmmo)
+                {
+                    ammoStr = "∞";
+                }
+                else if (weapon.MagazineSize > 0)
+                {
+                    ammoStr = weapon.MagazineAmmo.ToString();
+                }
+                else
+                {
+                    ammoStr = weapon.CurrentAmmo.ToString();
+                }
+            }
+            else
+            {
+                ammoStr = _ammo.ToString();
+            }
+
             if (_cachedAmmoText != ammoStr)
             {
                 _cachedAmmoText = ammoStr;
@@ -945,12 +1105,49 @@ namespace GORE.UI
 
                 // Space to shoot
                 case VirtualKey.Space:
-                    if (isPressed && _ammo > 0)
+                    _fireTriggerHeld = isPressed;
+                    break;
+
+                // R to reload
+                case VirtualKey.R:
+                    if (isPressed)
                     {
-                        _ammo--;
-                        _hudNeedsUpdate = true; // Force HUD update on ammo change
-                        // TODO: Implement shooting
+                        _weaponSystem?.Reload();
                     }
+                    break;
+
+                // Number keys 1-8 for weapon switching
+                case VirtualKey.Number1:
+                    if (isPressed) _weaponSystem?.SwitchToWeapon(0);
+                    break;
+                case VirtualKey.Number2:
+                    if (isPressed) _weaponSystem?.SwitchToWeapon(1);
+                    break;
+                case VirtualKey.Number3:
+                    if (isPressed) _weaponSystem?.SwitchToWeapon(2);
+                    break;
+                case VirtualKey.Number4:
+                    if (isPressed) _weaponSystem?.SwitchToWeapon(3);
+                    break;
+                case VirtualKey.Number5:
+                    if (isPressed) _weaponSystem?.SwitchToWeapon(4);
+                    break;
+                case VirtualKey.Number6:
+                    if (isPressed) _weaponSystem?.SwitchToWeapon(5);
+                    break;
+                case VirtualKey.Number7:
+                    if (isPressed) _weaponSystem?.SwitchToWeapon(6);
+                    break;
+                case VirtualKey.Number8:
+                    if (isPressed) _weaponSystem?.SwitchToWeapon(7);
+                    break;
+
+                // Mouse wheel for weapon cycling (Q/E)
+                case VirtualKey.Q:
+                    if (isPressed) _weaponSystem?.PreviousWeapon();
+                    break;
+                case VirtualKey.E:
+                    if (isPressed) _weaponSystem?.NextWeapon();
                     break;
 
                 // Escape to exit
@@ -971,6 +1168,9 @@ namespace GORE.UI
 
                             // Dispose renderer
                             _renderer?.Dispose();
+
+                            // Dispose weapon system
+                            _weaponSystem?.Dispose();
 
                             Close();
                         }

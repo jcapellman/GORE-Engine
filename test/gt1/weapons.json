@@ -1,0 +1,38 @@
+{
+  "weapons": [
+    {
+      "id": 1,
+      "name": "Marc23",
+      "damage_per_round": 25,
+      "magazine_size": 12,
+      "max_ammo": 48,
+      "ammo_type": "45acp",
+      "fire_rate": 1.0,
+      "sprite_scale": 0.6,
+      "infinite_ammo": false,
+      "sprites": {
+        "idle": "gt1/weapons/marc23_idle.png",
+        "fire": "gt1/weapons/marc23_fire.png",
+        "fire_alt": "gt1/weapons/marc23_fire_alt.png",
+        "reload": "gt1/weapons/marc23_reload.png"
+      }
+    },
+    {
+      "id": 2,
+      "name": "VP5",
+      "damage_per_round": 15,
+      "magazine_size": 30,
+      "max_ammo": 100,
+      "ammo_type": "9mm",
+      "fire_rate": 0.05,
+      "sprite_scale": 0.7,
+      "infinite_ammo": false,
+      "sprites": {
+        "idle": "gt1/weapons/vp5_idle.png",
+        "fire": "gt1/weapons/vp5_fire.png",
+        "fire_alt": "gt1/weapons/vp5_fire_alt.png",n
+        "reload": "gt1/weapons/vp5_reload.png"
+      }
+    }
+  ]
+}
