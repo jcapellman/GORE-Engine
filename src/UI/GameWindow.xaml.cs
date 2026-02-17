@@ -18,10 +18,10 @@ namespace GORE.UI
     public sealed partial class GameWindow : Window
     {
         private RaycastEngine _raycastEngine;
-        private Renderer3D _renderer;
+        private RendererSystem _rendererSystem;
         private bool _isGameLoopRunning;
         private GameConsole _console;
-        private GameConfig _config;
+        // config is managed via ConfigSystem
         private bool _consoleVisible;
         private Dictionary<int, string> _pendingTextureMapping;
         private bool _isLoadingTextures;
@@ -32,18 +32,16 @@ namespace GORE.UI
         // and wait for the user to press any key or click before exiting.
         private bool _criticalInitError;
 
-        private bool _moveForward;
-        private bool _moveBackward;
-        private bool _strafeLeft;
-        private bool _strafeRight;
-        private bool _turnLeft;
-        private bool _turnRight;
-        private bool _fireTriggerHeld;
+        private InputSystem _inputSystem;
 
         private Stopwatch _frameTimer;
         private int _health = 100;
         private int _ammo = 50;
         private WeaponSystem _weaponSystem;
+        private MapSystem _mapSystem;
+        private ConfigSystem _configSystem;
+        private SoundEffectSystem _sfxSystem;
+        private MusicSystem _musicSystem;
 
         // FPS tracking
         private int _frameCount = 0;
@@ -94,6 +92,10 @@ namespace GORE.UI
             // Pointer press handler for dismissing fatal init errors
             RootGrid.PointerPressed += RootGrid_PointerPressed;
 
+            // Initialize InputSystem and wire up weapon cycling
+            _inputSystem = new InputSystem();
+            // Weapon system will be initialized later; defer wiring until after subsystems created
+
             // Start initialization sequence
             _ = RunInitializationSequenceAsync();
         }
@@ -121,9 +123,35 @@ namespace GORE.UI
 
                 // Initialize Config
                 LogInit("Initializing configuration system...");
-                InitializeConfig();
-                LogInit($"  {_config.ConfigStatusMessage}");
-                LogInit($"  Config file: {Path.GetFileName(_config.ConfigPath)}");
+                _configSystem = new ConfigSystem(); // Initialize ConfigSystem
+                _configSystem.Load(); // Load configuration (throws on failure)
+                LogInit($"  Config loaded"); // Log config loaded message
+                // Validate and subscribe using ConfigSystem to handle changes
+                _configSystem.ValidateAndClamp(); // Validate config values
+                _configSystem.SubscribeToChanges(v => OnRenderResolutionChanged(v), v => OnConfigChanged(v)); // Subscribe to changes
+                // Subscribe to config value updates for cached values to keep them updated
+                _configSystem.ConfigValuesUpdated += () => UpdateCachedConfigValues(); // Update cached values on change
+                // Subscribe to typed render resolution change to recreate renderer automatically
+                _configSystem.RenderResolutionChanged += (w, h) =>
+                {
+                    // Recreate renderer with new resolution
+                    try
+                    {
+                        _rendererSystem?.Dispose();
+                        _rendererSystem = new RendererSystem();
+                        _rendererSystem.Initialize(w, h, _raycastEngine);
+                        if (ViewportCanvas?.Device != null)
+                        {
+                            _rendererSystem.InitializeResources(ViewportCanvas.Device, (int)ViewportCanvas.Size.Width, (int)ViewportCanvas.Size.Height);
+                            _resourcesInitialized = true;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Failed to recreate renderer on resolution change: {ex.Message}");
+                    }
+                };
+                UpdateCachedConfigValues(); // Initial update of cached values
 
                 // Initialize Console
                 LogInit("Initializing game console...");
@@ -147,13 +175,11 @@ namespace GORE.UI
                 await LoadHudIconsAsync();
 
                 // Initialize map
-                LogInit("Loading initial map...");
-                var mapPath = Path.Combine(baseDirectory, "gt1", "maps", "e1m1.map");
-
-                MapData mapData;
+                LogInit("Initializing map system...");
+                _mapSystem = new MapSystem();
                 try
                 {
-                    mapData = await MapLoader.LoadMapAsync(mapPath);
+                    var mapData = await _mapSystem.LoadInitialMapAsync("e1m1");
                     LogInit($"  Map: {mapData.Name}");
                     LogInit($"  Dimensions: {mapData.Width}x{mapData.Height}");
                     LogInit($"  Textures defined: {mapData.TextureMapping.Count}");
@@ -162,7 +188,6 @@ namespace GORE.UI
                 {
                     LogInit($"ERROR: Failed to load map - {ex.Message}");
                     LogInit("FATAL: Cannot start without valid map");
-                    // Enter critical error state and wait for user to dismiss
                     _criticalInitError = true;
                     LogInit("");
                     LogInit("Press any key or click to exit");
@@ -172,7 +197,8 @@ namespace GORE.UI
                 // Verify all texture files exist
                 LogInit("Verifying texture files...");
                 var missingTextures = new List<string>();
-                foreach (var texMapping in mapData.TextureMapping)
+                var mapDataLocal = _mapSystem.CurrentMap; // map system exposes loaded map
+                foreach (var texMapping in mapDataLocal.TextureMapping)
                 {
                     var texturePath = Path.Combine(baseDirectory, texMapping.Value);
                     if (!File.Exists(texturePath))
@@ -204,26 +230,33 @@ namespace GORE.UI
 
                 // Initialize raycasting engine
                 LogInit("Initializing raycasting engine...");
-                _raycastEngine = new RaycastEngine(mapData.Grid);
-                _raycastEngine.PlayerPosition = mapData.PlayerStart;
-                LogInit($"  Player spawned at ({mapData.PlayerStart.X:F2}, {mapData.PlayerStart.Y:F2})");
+                var map = _mapSystem.CurrentMap;
+                _raycastEngine = new RaycastEngine(map.Grid);
+                _raycastEngine.PlayerPosition = map.PlayerStart;
+                LogInit($"  Player spawned at ({map.PlayerStart.X:F2}, {map.PlayerStart.Y:F2})");
 
-                // Initialize renderer
+                // Initialize renderer system
                 LogInit("Initializing 3D renderer...");
-                int renderWidth = GetConfigValue("r_width", 640);
-                int renderHeight = GetConfigValue("r_height", 480);
-                _renderer = new Renderer3D(renderWidth, renderHeight, _raycastEngine);
+                int renderWidth = _configSystem.RenderWidth;
+                int renderHeight = _configSystem.RenderHeight;
+                _rendererSystem = new RendererSystem();
+                _rendererSystem.Initialize(renderWidth, renderHeight, _raycastEngine);
                 LogInit($"  Resolution: {renderWidth}x{renderHeight}");
                 LogInit("  Win2D hardware acceleration enabled");
 
                 // Store texture mapping for later
-                _pendingTextureMapping = mapData.TextureMapping;
+                _pendingTextureMapping = _mapSystem.CurrentMap.TextureMapping; 
 
-                // Initialize weapon system
-                LogInit("Initializing weapon system...");
+                // Initialize systems (weapons, audio, sfx)
+                LogInit("Initializing subsystem managers...");
                 _weaponSystem = new WeaponSystem();
-                _weaponSystem.LoadWeaponsConfig(); // Load from gt1/weapons.json
-                LogInit("  Weapons loaded from config");
+                _weaponSystem.LoadWeaponsConfig();
+                _sfxSystem = new SoundEffectSystem();
+                _musicSystem = new MusicSystem();
+                // Now wire input system to weapons
+                _inputSystem.NextWeaponRequested = () => _weaponSystem?.NextWeapon();
+                _inputSystem.PreviousWeaponRequested = () => _weaponSystem?.PreviousWeapon();
+                LogInit("  Subsystems initialized");
 
                 // Register console commands
                 LogInit("Registering console commands...");
@@ -452,70 +485,22 @@ namespace GORE.UI
             });
         }
 
-        private void InitializeConfig()
-        {
-            _config = new GameConfig();
-            _config.LoadConfig();
-
-            // Validate and clamp critical config values to safe ranges
-            ValidateConfigValue("r_width", 320, 7680, 640);
-            ValidateConfigValue("r_height", 240, 4320, 480);
-            ValidateConfigValue("r_fov", 60.0f, 120.0f, 90.0f);
-            ValidateConfigValue("m_sensitivity", 0.0001f, 0.1f, 0.002f);
-            ValidateConfigValue("r_maxfps", 30, 300, 60);
-
-            // Cache frequently accessed config values
-            UpdateCachedConfigValues();
-
-            // Subscribe to important config changes
-            var renderWidthVar = _config.Get("r_width");
-            var renderHeightVar = _config.Get("r_height");
-            var showFpsVar = _config.Get("r_showfps");
-            var mouseSensitivityVar = _config.Get("m_sensitivity");
-
-            renderWidthVar.OnChanged += OnRenderResolutionChanged;
-            renderHeightVar.OnChanged += OnRenderResolutionChanged;
-            showFpsVar.OnChanged += OnConfigChanged;
-            mouseSensitivityVar.OnChanged += OnConfigChanged;
-        }
-
-        /// <summary>
-        /// Validate and clamp a config value to a safe range
-        /// </summary>
-        private void ValidateConfigValue<T>(string name, T min, T max, T defaultValue) where T : IComparable<T>
-        {
-            var variable = _config.Get(name);
-            if (variable == null) return;
-
-            var currentValue = variable.GetValue<T>();
-
-            // Clamp to valid range
-            if (currentValue.CompareTo(min) < 0)
-            {
-                System.Diagnostics.Debug.WriteLine($"  Config {name} too low ({currentValue}), clamping to {min}");
-                variable.SetValue(min, silent: true);
-            }
-            else if (currentValue.CompareTo(max) > 0)
-            {
-                System.Diagnostics.Debug.WriteLine($"  Config {name} too high ({currentValue}), clamping to {max}");
-                variable.SetValue(max, silent: true);
-            }
-        }
+        // Config handled by ConfigSystem; helpers removed
 
         /// <summary>
         /// Safely get a config value with fallback default
         /// </summary>
         private T GetConfigValue<T>(string name, T defaultValue)
         {
-            if (_config == null) return defaultValue;
-            return _config.GetValue(name, defaultValue);
+            if (_configSystem == null) return defaultValue;
+            return _configSystem.GetValue(name, defaultValue);
         }
 
         private void UpdateCachedConfigValues()
         {
-            // Always use safe defaults if config is missing or invalid
-            _showFps = GetConfigValue("r_showfps", true);
-            _mouseSensitivity = GetConfigValue("m_sensitivity", 0.002f);
+            // ConfigSystem is guaranteed to be non-null after initialization
+            _showFps = _configSystem.ShowFps;
+            _mouseSensitivity = _configSystem.MouseSensitivity;
         }
 
         private void OnConfigChanged(ConfigVariable variable)
@@ -533,7 +518,8 @@ namespace GORE.UI
         private void InitializeConsole()
         {
             _console = new GameConsole();
-            _console.SetConfig(_config);
+            _console.SetConfig(_configSystem.GetConfig());
+            _console.OnHistoryChanged += UpdateConsoleDisplay;
             _console.OnHistoryChanged += UpdateConsoleDisplay;
         }
 
@@ -681,17 +667,18 @@ namespace GORE.UI
                 var wasRunning = _isGameLoopRunning;
                 _isGameLoopRunning = false;
 
-                // Dispose old renderer
-                _renderer?.Dispose();
+                // Dispose old renderer system
+                _rendererSystem?.Dispose();
 
                 // Update raycasting engine with new map
                 _raycastEngine = new RaycastEngine(mapData.Grid);
                 _raycastEngine.PlayerPosition = mapData.PlayerStart;
 
-                // Update renderer with resolution from config
-                int renderWidth = GetConfigValue("r_width", 640);
-                int renderHeight = GetConfigValue("r_height", 480);
-                _renderer = new Renderer3D(renderWidth, renderHeight, _raycastEngine);
+                // Update renderer system with resolution from config
+                int renderWidth = _configSystem.RenderWidth;
+                int renderHeight = _configSystem.RenderHeight;
+                _rendererSystem = new RendererSystem();
+                _rendererSystem.Initialize(renderWidth, renderHeight, _raycastEngine);
 
                 // Reset initialization flags
                 _resourcesInitialized = false;
@@ -700,17 +687,17 @@ namespace GORE.UI
                 // Initialize Win2D resources if canvas is ready
                 if (ViewportCanvas.Device != null)
                 {
-                    _renderer.InitializeResources(ViewportCanvas.Device, (int)ViewportCanvas.Size.Width, (int)ViewportCanvas.Size.Height);
+                    _rendererSystem.InitializeResources(ViewportCanvas.Device, (int)ViewportCanvas.Size.Width, (int)ViewportCanvas.Size.Height);
                     _resourcesInitialized = true;
 
                     // Load textures for the new map
                     _console.AddToHistory("Loading textures...");
-                    _isLoadingTextures = true;
+                            _isLoadingTextures = true; // Set loading flag
                     foreach (var texMapping in mapData.TextureMapping)
                     {
                         try
                         {
-                            await _renderer.LoadTextureAsync(texMapping.Key, texMapping.Value, ViewportCanvas.Device);
+                            await _rendererSystem.LoadTextureAsync(texMapping.Key, texMapping.Value, ViewportCanvas.Device);
                         }
                         catch (Exception ex)
                         {
@@ -757,23 +744,23 @@ namespace GORE.UI
 
         private void ViewportCanvas_Update(ICanvasAnimatedControl sender, CanvasAnimatedUpdateEventArgs args)
         {
-            if (!_isGameLoopRunning || _renderer == null || _raycastEngine == null)
+            if (!_isGameLoopRunning || _rendererSystem == null || _raycastEngine == null)
                 return;
 
             // Initialize Win2D resources on first update if needed
-            if (!_resourcesInitialized && _renderer.GetRenderTarget() == null)
+            if (!_resourcesInitialized && _rendererSystem.GetRenderTarget() == null)
             {
                 try
                 {
                     // Initialize render target to match the canvas size to avoid scaling artifacts
-                    _renderer.InitializeResources(sender.Device, (int)sender.Size.Width, (int)sender.Size.Height);
+                    _rendererSystem.InitializeResources(sender.Device, (int)sender.Size.Width, (int)sender.Size.Height);
                     _resourcesInitialized = true;
 
                     // Start loading textures asynchronously
                     if (_pendingTextureMapping != null && !_isLoadingTextures)
                     {
                         _isLoadingTextures = true;
-                        _ = LoadTexturesAsync(sender.Device);
+                            _ = LoadTexturesAsync(sender.Device); // Start loading textures
                     }
                 }
                 catch (Exception ex)
@@ -797,14 +784,33 @@ namespace GORE.UI
             float deltaTime = _lastDeltaTime * 0.7f + clampedDeltaTime * 0.3f;
             _lastDeltaTime = deltaTime;
 
-            // Update player movement
-            UpdatePlayerMovement(deltaTime);
+            // Update player movement using InputSystem
+            Vector2 movementInput = Vector2.Zero;
+            bool needMove = false;
+
+            if (_inputSystem.MoveForward) { movementInput += _raycastEngine.PlayerDirection; needMove = true; }
+            if (_inputSystem.MoveBackward) { movementInput -= _raycastEngine.PlayerDirection; needMove = true; }
+            if (_inputSystem.StrafeLeft || _inputSystem.StrafeRight)
+            {
+                _cachedRightVector = new Vector2(_raycastEngine.PlayerDirection.Y, -_raycastEngine.PlayerDirection.X);
+                if (_inputSystem.StrafeLeft) { movementInput -= _cachedRightVector; needMove = true; }
+                if (_inputSystem.StrafeRight) { movementInput += _cachedRightVector; needMove = true; }
+            }
+
+            if (needMove)
+            {
+                movementInput = Vector2.Normalize(movementInput);
+                _raycastEngine.MovePlayer(movementInput, deltaTime);
+            }
+
+            if (_inputSystem.TurnLeft) _raycastEngine.RotatePlayer(2.0f * deltaTime);
+            if (_inputSystem.TurnRight) _raycastEngine.RotatePlayer(-2.0f * deltaTime);
 
             // Update doors
             _raycastEngine?.UpdateDoors(deltaTime);
 
             // Handle continuous firing
-            if (_fireTriggerHeld)
+            if (_inputSystem.FireTriggerHeld)
             {
                 if (_weaponSystem?.TryFire() == true)
                 {
@@ -850,7 +856,7 @@ namespace GORE.UI
                 {
                     try
                     {
-                        await _renderer.LoadTextureAsync(texMapping.Key, texMapping.Value, device);
+                        await _rendererSystem.LoadTextureAsync(texMapping.Key, texMapping.Value, device);
                     }
                     catch (Exception ex)
                     {
@@ -907,8 +913,8 @@ namespace GORE.UI
 
         private void ViewportCanvas_Draw(ICanvasAnimatedControl sender, CanvasAnimatedDrawEventArgs args)
         {
-            // Don't render if resources aren't initialized or textures are still loading
-            if (_renderer == null || _renderer.GetRenderTarget() == null || _isLoadingTextures)
+                // Don't render if resources aren't initialized or textures are still loading
+            if (_rendererSystem == null || _rendererSystem.GetRenderTarget() == null || _isLoadingTextures)
             {
                 // Draw loading screen
                 args.DrawingSession.Clear(Windows.UI.Color.FromArgb(255, 0, 0, 0));
@@ -918,7 +924,7 @@ namespace GORE.UI
             try
             {
                 // Render the 3D scene, scaled to fill the canvas
-                _renderer.Render(args.DrawingSession, (float)sender.Size.Width, (float)sender.Size.Height);
+                _rendererSystem.Render(args.DrawingSession, (float)sender.Size.Width, (float)sender.Size.Height);
 
                 // Render weapon sprite on top
                 _weaponSystem?.Render(args.DrawingSession, (float)sender.Size.Width, (float)sender.Size.Height);
@@ -931,54 +937,7 @@ namespace GORE.UI
 
         private void UpdatePlayerMovement(float deltaTime)
         {
-            Vector2 movement = Vector2.Zero;
-            bool needsMovement = false;
-
-            // Forward/Backward
-            if (_moveForward)
-            {
-                movement += _raycastEngine.PlayerDirection;
-                needsMovement = true;
-            }
-            if (_moveBackward)
-            {
-                movement -= _raycastEngine.PlayerDirection;
-                needsMovement = true;
-            }
-
-            // Strafing - cache the right vector to avoid duplicate calculations
-            if (_strafeLeft || _strafeRight)
-            {
-                _cachedRightVector = new Vector2(_raycastEngine.PlayerDirection.Y, -_raycastEngine.PlayerDirection.X);
-
-                if (_strafeLeft)
-                {
-                    movement -= _cachedRightVector;
-                    needsMovement = true;
-                }
-                if (_strafeRight)
-                {
-                    movement += _cachedRightVector;
-                    needsMovement = true;
-                }
-            }
-
-            // Apply movement only if needed
-            if (needsMovement)
-            {
-                movement = Vector2.Normalize(movement);
-                _raycastEngine.MovePlayer(movement, deltaTime);
-            }
-
-            // Rotation - use cached sensitivity
-            if (_turnLeft || _turnRight)
-            {
-                float rotSpeed = 2.0f * deltaTime;
-                if (_turnLeft)
-                    _raycastEngine.RotatePlayer(rotSpeed);
-                if (_turnRight)
-                    _raycastEngine.RotatePlayer(-rotSpeed);
-            }
+            // Now handled inline in the update loop via InputSystem
         }
 
         private void UpdateFPS(float deltaTime)
@@ -1076,7 +1035,8 @@ namespace GORE.UI
                 return;
             }
 
-            HandleKeyInput(e.Key, true);
+            // Delegate to input system
+            _inputSystem.HandleKey(e.Key, true);
             e.Handled = true;
         }
 
@@ -1095,7 +1055,8 @@ namespace GORE.UI
                 return;
             }
 
-            HandleKeyInput(e.Key, false);
+            // Delegate to input system
+            _inputSystem.HandleKey(e.Key, false);
             e.Handled = true;
         }
 
@@ -1191,120 +1152,60 @@ namespace GORE.UI
 
         private void HandleKeyInput(VirtualKey key, bool isPressed)
         {
+            // Delegate continuous/hold input to InputSystem
+            _inputSystem?.HandleKey(key, isPressed);
+
+            // Only handle one-shot actions on key press
+            if (!isPressed) return;
+
             switch (key)
             {
-                // WASD movement
-                case VirtualKey.W:
-                    _moveForward = isPressed;
-                    break;
-                case VirtualKey.S:
-                    _moveBackward = isPressed;
-                    break;
-                case VirtualKey.A:
-                    _strafeLeft = isPressed;
-                    break;
-                case VirtualKey.D:
-                    _strafeRight = isPressed;
-                    break;
-
-                // Arrow keys for rotation
-                case VirtualKey.Left:
-                    _turnLeft = isPressed;
-                    break;
-                case VirtualKey.Right:
-                    _turnRight = isPressed;
-                    break;
-
-                // Control to shoot
-                case VirtualKey.Control:
-                    _fireTriggerHeld = isPressed;
-                    break;
-
-                // Space to open doors/toggle switches
                 case VirtualKey.Space:
-                    if (isPressed)
+                    // Try to interact with door
+                    bool doorFound = _raycastEngine?.TryInteractWithDoor() == true;
+                    if (doorFound)
                     {
-                        // Try to interact with door
-                        bool doorFound = _raycastEngine?.TryInteractWithDoor() == true;
-
-                        if (doorFound)
-                        {
-                            System.Diagnostics.Debug.WriteLine("Door interaction triggered!");
-                            // Door interaction successful (optional: play sound here)
-                        }
-                        else
-                        {
-                            System.Diagnostics.Debug.WriteLine($"No door found near player at ({_raycastEngine?.PlayerPosition.X:F2}, {_raycastEngine?.PlayerPosition.Y:F2})");
-                        }
+                        System.Diagnostics.Debug.WriteLine("Door interaction triggered!");
+                        _sfxSystem?.Play("door");
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine($"No door found near player at ({_raycastEngine?.PlayerPosition.X:F2}, {_raycastEngine?.PlayerPosition.Y:F2})");
                     }
                     break;
 
-                // R to reload
                 case VirtualKey.R:
-                    if (isPressed)
-                    {
-                        _weaponSystem?.Reload();
-                    }
+                    _weaponSystem?.Reload();
                     break;
 
-                // Number keys 1-8 for weapon switching
-                case VirtualKey.Number1:
-                    if (isPressed) _weaponSystem?.SwitchToWeapon(0);
-                    break;
-                case VirtualKey.Number2:
-                    if (isPressed) _weaponSystem?.SwitchToWeapon(1);
-                    break;
-                case VirtualKey.Number3:
-                    if (isPressed) _weaponSystem?.SwitchToWeapon(2);
-                    break;
-                case VirtualKey.Number4:
-                    if (isPressed) _weaponSystem?.SwitchToWeapon(3);
-                    break;
-                case VirtualKey.Number5:
-                    if (isPressed) _weaponSystem?.SwitchToWeapon(4);
-                    break;
-                case VirtualKey.Number6:
-                    if (isPressed) _weaponSystem?.SwitchToWeapon(5);
-                    break;
-                case VirtualKey.Number7:
-                    if (isPressed) _weaponSystem?.SwitchToWeapon(6);
-                    break;
-                case VirtualKey.Number8:
-                    if (isPressed) _weaponSystem?.SwitchToWeapon(7);
-                    break;
+                case VirtualKey.Number1: _weaponSystem?.SwitchToWeapon(0); break;
+                case VirtualKey.Number2: _weaponSystem?.SwitchToWeapon(1); break;
+                case VirtualKey.Number3: _weaponSystem?.SwitchToWeapon(2); break;
+                case VirtualKey.Number4: _weaponSystem?.SwitchToWeapon(3); break;
+                case VirtualKey.Number5: _weaponSystem?.SwitchToWeapon(4); break;
+                case VirtualKey.Number6: _weaponSystem?.SwitchToWeapon(5); break;
+                case VirtualKey.Number7: _weaponSystem?.SwitchToWeapon(6); break;
+                case VirtualKey.Number8: _weaponSystem?.SwitchToWeapon(7); break;
 
-                // Mouse wheel for weapon cycling (Q/E)
                 case VirtualKey.Q:
-                    if (isPressed) _weaponSystem?.PreviousWeapon();
+                    _weaponSystem?.PreviousWeapon();
                     break;
                 case VirtualKey.E:
-                    if (isPressed) _weaponSystem?.NextWeapon();
+                    _weaponSystem?.NextWeapon();
                     break;
 
-                // Escape to exit
                 case VirtualKey.Escape:
-                    if (isPressed)
+                    if (_consoleVisible)
                     {
-                        // If console is open, just close it, don't exit the game
-                        if (_consoleVisible)
-                        {
-                            ToggleConsole();
-                        }
-                        else
-                        {
-                            _isGameLoopRunning = false;
-
-                            // Save config on exit
-                            _config?.SaveConfig();
-
-                            // Dispose renderer
-                            _renderer?.Dispose();
-
-                            // Dispose weapon system
-                            _weaponSystem?.Dispose();
-
-                            Close();
-                        }
+                        ToggleConsole();
+                    }
+                    else
+                    {
+                        _isGameLoopRunning = false;
+                        _configSystem?.Save();
+                        _rendererSystem?.Dispose();
+                        _weaponSystem?.Dispose();
+                        Close();
                     }
                     break;
             }

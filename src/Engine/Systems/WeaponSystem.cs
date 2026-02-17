@@ -19,6 +19,7 @@ namespace GORE.Engine
         private WeaponAnimationState _animationState;
         private float _animationTimer;
         private float _fireTimer;
+        private int _frameCount = 0;
 
         // Animation frame durations (in seconds)
         private const float FIRE_ANIM_DURATION = 0.15f;
@@ -413,12 +414,8 @@ namespace GORE.Engine
 
             // Draw weapon sprite with destination rectangle for proper scaling
             var destRect = new Windows.Foundation.Rect(x, y, weaponWidth, weaponHeight);
-            session.DrawImage(frame, destRect, 
-                new Windows.Foundation.Rect(0, 0, frame.Size.Width, frame.Size.Height),
-                1.0f, CanvasImageInterpolation.NearestNeighbor);
+            session.DrawImage(frame, destRect, new Windows.Foundation.Rect(0, 0, frame.Size.Width, frame.Size.Height), 1.0f, CanvasImageInterpolation.NearestNeighbor);
         }
-
-        private int _frameCount = 0;
 
         /// <summary>
         /// Get weapon by index
@@ -464,3 +461,4 @@ namespace GORE.Engine
         Reloading
     }
 }
+
