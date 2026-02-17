@@ -4,15 +4,7 @@ using System.Numerics;
 
 namespace GORE.Engine
 {
-    public class DoorState
-    {
-        public int MapX { get; set; }
-        public int MapY { get; set; }
-        public float OpenAmount { get; set; } = 0f; // 0 = closed, 1 = fully open
-        public bool IsOpening { get; set; } = false;
-        public bool IsClosing { get; set; } = false;
-        public float CloseTimer { get; set; } = 0f;
-    }
+    // DoorState moved to src/Engine/Data/DoorState.cs
 
     public class RaycastEngine
     {
@@ -355,16 +347,5 @@ namespace GORE.Engine
         }
     }
 
-    public struct RaycastHit
-    {
-        public float Distance;
-        public int Side;
-        public int MapX;
-        public int MapY;
-        public int WallType;
-        public float WallX;
-        public float RayDirX;
-        public float RayDirY;
-        public bool IsDoor => WallType == 5; // Doors use texture ID 5
-    }
+    // RaycastHit moved to src/Engine/Data/RaycastHit.cs
 }
