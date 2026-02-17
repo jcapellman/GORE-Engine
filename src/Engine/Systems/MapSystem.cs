@@ -1,8 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 
-namespace GORE.Engine
+namespace GORE.Engine.Systems
 {
     public class MapSystem
     {
@@ -14,6 +15,8 @@ namespace GORE.Engine
             var mapPath = Path.Combine(baseDirectory, "gt1", "maps", $"{mapName}.map");
             CurrentMap = await MapLoader.LoadMapAsync(mapPath);
             return CurrentMap;
+        }        
+        
         public event Action<MapData> MapLoaded;
 
         /// <summary>
@@ -45,8 +48,6 @@ namespace GORE.Engine
                 }
             }
             return missingTextures;
-        }
-
         }
     }
 }

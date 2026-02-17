@@ -17,45 +17,23 @@ namespace GORE.UI
 {
     public sealed partial class GameWindow : Window
     {
-        private RaycastEngine _raycastEngine;
-        private RendererSystem _rendererSystem;
+        private GOREEngineInstance _engine;
         private bool _isGameLoopRunning;
-        private GameConsole _console;
-        // config is managed via ConfigSystem
         private bool _consoleVisible;
-        private Dictionary<int, string> _pendingTextureMapping;
-        private bool _isLoadingTextures;
-        private bool _resourcesInitialized;
-        private System.Text.StringBuilder _initLog;
-        
-        // If a critical error occurs during initialization, set this to true
-        // and wait for the user to press any key or click before exiting.
         private bool _criticalInitError;
-
-        private InputSystem _inputSystem;
-
-        private Stopwatch _frameTimer;
+        private System.Text.StringBuilder _initLog;
+        private float _lastDeltaTime = 0.016f;
+        private const float MAX_DELTA_TIME = 0.05f;
+        private float _mouseSensitivity = 0.002f;
+        private Vector2 _cachedRightVector;
+        private Microsoft.UI.Dispatching.DispatcherQueueHandler _updateHudAction;
         private int _health = 100;
         private int _ammo = 50;
-        private WeaponSystem _weaponSystem;
-        private MapSystem _mapSystem;
-        private ConfigSystem _configSystem;
-        private SoundEffectSystem _sfxSystem;
-        private MusicSystem _musicSystem;
-
-        // Delta time smoothing
-        private float _lastDeltaTime = 0.016f;
-        private const float MAX_DELTA_TIME = 0.05f; // Cap at 50ms (20 FPS minimum)
-
-        // Cached config values (updated when config changes)
-        private float _mouseSensitivity = 0.002f;
-
-        // Cached vectors to reduce allocations
-        private Vector2 _cachedRightVector;
-
-        // HUD system
-        private HudSystem _hudSystem;
-        private Microsoft.UI.Dispatching.DispatcherQueueHandler _updateHudAction;
+        private int _frameCount = 0;
+        private bool _resourcesInitialized;
+        private bool _isLoadingTextures;
+        private Dictionary<int, string> _pendingTextureMapping;
+        private Stopwatch _frameTimer;
 
         public GameWindow()
         {
@@ -64,38 +42,24 @@ namespace GORE.UI
 
             
 
-            // Initialize HUD system
-            _hudSystem = new HudSystem();
             _updateHudAction = () =>
             {
-                HealthText.Text = _hudSystem.HealthText;
-                AmmoText.Text = _hudSystem.AmmoText;
-                FpsText.Visibility = _hudSystem.ShowFps ? Visibility.Visible : Visibility.Collapsed;
-                if (_hudSystem.ShowFps)
+                if (_engine != null && _engine.HudSystem != null)
                 {
-                    FpsText.Text = _hudSystem.FpsText;
+                    HealthText.Text = _engine.HudSystem.HealthText;
+                    AmmoText.Text = _engine.HudSystem.AmmoText;
+                    FpsText.Visibility = _engine.HudSystem.ShowFps ? Visibility.Visible : Visibility.Collapsed;
+                    if (_engine.HudSystem.ShowFps)
+                    {
+                        FpsText.Text = _engine.HudSystem.FpsText;
+                    }
                 }
             };
 
-            // Pointer press handler for dismissing fatal init errors
             RootGrid.PointerPressed += RootGrid_PointerPressed;
 
-
-            // Initialize EventSystem
-            _eventSystem = new EventSystem();
-
-            // Initialize InputSystem and wire up weapon cycling
-            _inputSystem = new InputSystem();
-            _inputSystem.PreviousWeaponRequested += () => _weaponSystem?.PreviousWeapon();
-            _inputSystem.NextWeaponRequested += () => _weaponSystem?.NextWeapon();
-            _inputSystem.WeaponNumberKeyPressed += idx => _weaponSystem?.SwitchToWeapon(idx);
-            // Weapon system will be initialized later; defer wiring until after subsystems created
-
-            // Subscribe to door event for sound
-            _eventSystem.Subscribe<DoorInteractedEvent>(_ => _sfxSystem?.Play("door"));
-
-            // Start initialization sequence
-            _ = RunInitializationSequenceAsync();
+            // Start engine initialization
+            _ = InitializeEngineAsync();
         }
 
         private void RootGrid_PointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
@@ -107,189 +71,64 @@ namespace GORE.UI
             }
         }
 
-        private async System.Threading.Tasks.Task RunInitializationSequenceAsync()
+        private async System.Threading.Tasks.Task InitializeEngineAsync()
         {
-            try
+            ExtendsContentIntoTitleBar = true;
+            ScreenHelper.EnterFullScreenMode(this);
+            InitScreen.Visibility = Visibility.Visible;
+            await System.Threading.Tasks.Task.Delay(100);
+
+            _initLog = new System.Text.StringBuilder();
+            void log(string msg) { _initLog.AppendLine(msg); LogInit(msg); }
+            void logError(string msg) { _initLog.AppendLine(msg); LogInit(msg); }
+
+            _engine = await GOREEngine.CreateAndInitializeAsync(log, logError);
+            if (_engine == null || _engine.CriticalInitError)
             {
-                ExtendsContentIntoTitleBar = true;
-                ScreenHelper.EnterFullScreenMode(this);
+                _criticalInitError = true;
+                LogInit("");
+                LogInit("FATAL: Cannot start without valid game systems");
+                LogInit("");
+                LogInit("Press any key or click to exit");
+                return;
+            }
 
-                // Ensure init screen is visible
-                InitScreen.Visibility = Visibility.Visible;
-
-                await System.Threading.Tasks.Task.Delay(100); // Let UI render
-
-                // Initialize Config
-                LogInit("Initializing configuration system...");
-                _configSystem = new ConfigSystem(); // Initialize ConfigSystem
-                _configSystem.Load(); // Load configuration (throws on failure)
-                LogInit($"  Config loaded"); // Log config loaded message
-                // Validate and subscribe using ConfigSystem to handle changes
-                _configSystem.ValidateAndClamp(); // Validate config values
-                _configSystem.SubscribeToChanges(v => OnRenderResolutionChanged(v), v => OnConfigChanged(v)); // Subscribe to changes
-                // Subscribe to config value updates for cached values to keep them updated
-                _configSystem.ConfigValuesUpdated += () => UpdateCachedConfigValues(); // Update cached values on change
-                // Subscribe to typed render resolution change to recreate renderer automatically
-                _configSystem.RenderResolutionChanged += (w, h) =>
-                {
-                    // Recreate renderer with new resolution
-                    try
-                    {
-                        _rendererSystem?.Dispose();
-                        _rendererSystem = new RendererSystem();
-                        _rendererSystem.Initialize(w, h, _raycastEngine);
-                        if (ViewportCanvas?.Device != null)
-                        {
-                            _rendererSystem.InitializeResources(ViewportCanvas.Device, (int)ViewportCanvas.Size.Width, (int)ViewportCanvas.Size.Height);
-                            _resourcesInitialized = true;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Failed to recreate renderer on resolution change: {ex.Message}");
-                    }
-                };
-                UpdateCachedConfigValues(); // Initial update of cached values
-
-                // Initialize Console
-                LogInit("Initializing game console...");
-                InitializeConsole();
-                LogInit("  Console ready");
-
-                // Check directories
-                LogInit("Checking game directories...");
-                var baseDirectory = AppContext.BaseDirectory;
-                CheckDirectory(Path.Combine(baseDirectory, "gt1"));
-                CheckDirectory(Path.Combine(baseDirectory, "gt1", "maps"));
-                CheckDirectory(Path.Combine(baseDirectory, "gt1", "textures"));
-                CheckDirectory(Path.Combine(baseDirectory, "gt1", "hud"));
-
-                // Load custom font
-                LogInit("Loading custom font...");
-                await LoadCustomFontAsync();
-
-                // Load HUD icons
-                LogInit("Loading HUD icons...");
-                await LoadHudIconsAsync();
-
-                // Initialize map
-                LogInit("Initializing map system...");
-                _mapSystem = new MapSystem();
+            // Setup config change handlers
+            _engine.ConfigSystem.SubscribeToChanges(v => OnRenderResolutionChanged(v), v => OnConfigChanged(v));
+            _engine.ConfigSystem.ConfigValuesUpdated += () => UpdateCachedConfigValues();
+            _engine.ConfigSystem.RenderResolutionChanged += (w, h) =>
+            {
                 try
                 {
-                    var mapData = await _mapSystem.LoadInitialMapAsync("e1m1");
-                    LogInit($"  Map: {mapData.Name}");
-                    LogInit($"  Dimensions: {mapData.Width}x{mapData.Height}");
-                    LogInit($"  Textures defined: {mapData.TextureMapping.Count}");
+                    _engine.RendererSystem?.Dispose();
+                    _engine.RendererSystem = new RendererSystem();
+                    _engine.RendererSystem.Initialize(w, h, _engine.RaycastEngine);
+                    if (ViewportCanvas?.Device != null)
+                    {
+                        _engine.RendererSystem.InitializeResources(ViewportCanvas.Device, (int)ViewportCanvas.Size.Width, (int)ViewportCanvas.Size.Height);
+                        _resourcesInitialized = true;
+                    }
                 }
                 catch (Exception ex)
                 {
-                    LogInit($"ERROR: Failed to load map - {ex.Message}");
-                    LogInit("FATAL: Cannot start without valid map");
-                    _criticalInitError = true;
-                    LogInit("");
-                    LogInit("Press any key or click to exit");
-                    return;
+                    System.Diagnostics.Debug.WriteLine($"Failed to recreate renderer on resolution change: {ex.Message}");
                 }
+            };
+            UpdateCachedConfigValues();
 
-                // Verify all texture files exist
-                LogInit("Verifying texture files...");
-                var missingTextures = new List<string>();
-                var mapDataLocal = _mapSystem.CurrentMap; // map system exposes loaded map
-                foreach (var texMapping in mapDataLocal.TextureMapping)
-                {
-                    var texturePath = Path.Combine(baseDirectory, texMapping.Value);
-                    if (!File.Exists(texturePath))
-                    {
-                        missingTextures.Add($"  Texture {texMapping.Key}: {texMapping.Value}");
-                    }
-                    else
-                    {
-                        LogInit($"  Texture {texMapping.Key}: {texMapping.Value} - OK");
-                    }
-                }
+            // Setup frame timer
+            _frameTimer = Stopwatch.StartNew();
+            _isGameLoopRunning = true;
 
-                if (missingTextures.Count > 0)
-                {
-                    LogInit("");
-                    LogInit("ERROR: Missing required texture files:");
-                    foreach (var missing in missingTextures)
-                    {
-                        LogInit(missing);
-                    }
-                    LogInit("");
-                    LogInit("FATAL: Cannot start with missing textures");
-                    // Enter critical error state and wait for user to dismiss
-                    _criticalInitError = true;
-                    LogInit("");
-                    LogInit("Press any key or click to exit");
-                    return;
-                }
+            LogInit("");
+            LogInit("Initialization complete!");
+            LogInit("");
+            LogInit("Press ~ to open console");
+            LogInit("Type 'help' for available commands");
+            LogInit("");
 
-                // Initialize raycasting engine
-                LogInit("Initializing raycasting engine...");
-                var map = _mapSystem.CurrentMap;
-                _raycastEngine = new RaycastEngine(map.Grid, _eventSystem);
-                _raycastEngine.PlayerPosition = map.PlayerStart;
-                LogInit($"  Player spawned at ({map.PlayerStart.X:F2}, {map.PlayerStart.Y:F2})");
-
-                // Initialize renderer system
-                LogInit("Initializing 3D renderer...");
-                int renderWidth = _configSystem.RenderWidth;
-                int renderHeight = _configSystem.RenderHeight;
-                _rendererSystem = new RendererSystem();
-                _rendererSystem.Initialize(renderWidth, renderHeight, _raycastEngine);
-                LogInit($"  Resolution: {renderWidth}x{renderHeight}");
-                LogInit("  Win2D hardware acceleration enabled");
-
-                // Store texture mapping for later
-                _pendingTextureMapping = _mapSystem.CurrentMap.TextureMapping; 
-
-                // Initialize systems (weapons, audio, sfx)
-                LogInit("Initializing subsystem managers...");
-                _weaponSystem = new WeaponSystem();
-                _weaponSystem.LoadWeaponsConfig();
-                _sfxSystem = new SoundEffectSystem();
-                _musicSystem = new MusicSystem();
-                // Now wire input system to weapons
-                _inputSystem.NextWeaponRequested = () => _weaponSystem?.NextWeapon();
-                _inputSystem.PreviousWeaponRequested = () => _weaponSystem?.PreviousWeapon();
-                LogInit("  Subsystems initialized");
-
-                // Register console commands
-                LogInit("Registering console commands...");
-                RegisterConsoleCommands();
-                LogInit("  Commands registered");
-
-                // Setup frame timer
-                _frameTimer = Stopwatch.StartNew();
-                _isGameLoopRunning = true;
-
-                LogInit("");
-                LogInit("Initialization complete!");
-                LogInit("");
-                LogInit("Press ~ to open console");
-                LogInit("Type 'help' for available commands");
-                LogInit("");
-
-                // Pause for effect (BUILD engine style)
-                await System.Threading.Tasks.Task.Delay(2000);
-
-                // Hide init screen and show game
-                InitScreen.Visibility = Visibility.Collapsed;
-            }
-            catch (Exception ex)
-            {
-                LogInit("");
-                LogInit($"FATAL ERROR: {ex.Message}");
-                LogInit("");
-                LogInit("Press any key or click to exit");
-                System.Diagnostics.Debug.WriteLine($"Initialization failed: {ex}");
-
-                // Enter critical error state and wait for user to dismiss
-                _criticalInitError = true;
-                return;
-            }
+            await System.Threading.Tasks.Task.Delay(2000);
+            InitScreen.Visibility = Visibility.Collapsed;
         }
 
         private void LogInit(string message)
@@ -303,9 +142,9 @@ namespace GORE.UI
             });
 
             // Also add to console if it's initialized
-            if (_console != null)
+            if (_engine != null && _engine.GameConsole != null)
             {
-                _console.AddToHistory(message);
+                _engine.GameConsole.AddToHistory(message);
             }
 
             System.Diagnostics.Debug.WriteLine(message);
@@ -325,18 +164,19 @@ namespace GORE.UI
 
         private void RegisterConsoleCommands()
         {
+            var console = _engine.GameConsole;
             // Register game-specific console commands
-            _console.RegisterGameCommands(_raycastEngine,
+            console.RegisterGameCommands(_engine.RaycastEngine,
                 health => _health = health,
                 ammo => _ammo = ammo);
 
             // Register map loading command
-            _console.RegisterCommand("map", "Load a map (usage: map <mapname>)", async args =>
+            console.RegisterCommand("map", "Load a map (usage: map <mapname>)", async args =>
             {
                 if (args.Length == 0)
                 {
-                    _console.AddToHistory("Usage: map <mapname>");
-                    _console.AddToHistory("Example: map e1m1");
+                    console.AddToHistory("Usage: map <mapname>");
+                    console.AddToHistory("Example: map e1m1");
                     return;
                 }
 
@@ -345,7 +185,7 @@ namespace GORE.UI
             });
 
             // Register map listing command
-            _console.RegisterCommand("maps", "List available maps", args =>
+            console.RegisterCommand("maps", "List available maps", args =>
             {
                 try
                 {
@@ -354,7 +194,7 @@ namespace GORE.UI
 
                     if (!Directory.Exists(mapsDirectory))
                     {
-                        _console.AddToHistory("Maps directory not found");
+                        console.AddToHistory("Maps directory not found");
                         return;
                     }
 
@@ -362,78 +202,80 @@ namespace GORE.UI
 
                     if (mapFiles.Length == 0)
                     {
-                        _console.AddToHistory("No maps found");
+                        console.AddToHistory("No maps found");
                         return;
                     }
 
-                    _console.AddToHistory("Available maps:");
+                    console.AddToHistory("Available maps:");
                     foreach (var mapFile in mapFiles.OrderBy(f => f))
                     {
                         var mapName = Path.GetFileNameWithoutExtension(mapFile);
-                        _console.AddToHistory($"  {mapName}");
+                        console.AddToHistory($"  {mapName}");
                     }
-                    _console.AddToHistory($"Total: {mapFiles.Length} map(s)");
+                    console.AddToHistory($"Total: {mapFiles.Length} map(s)");
                 }
                 catch (Exception ex)
                 {
-                    _console.AddToHistory($"Error listing maps: {ex.Message}");
+                    console.AddToHistory($"Error listing maps: {ex.Message}");
                 }
             });
 
             // Register weapon commands
-            _console.RegisterCommand("weapon", "Switch weapon (usage: weapon <0-7>)", args =>
+            console.RegisterCommand("weapon", "Switch weapon (usage: weapon <0-7>)", args =>
             {
+                var ws = _engine.WeaponSystem;
                 if (args.Length == 0)
                 {
-                    var current = _weaponSystem.CurrentWeapon;
-                    _console.AddToHistory($"Current weapon: [{_weaponSystem.CurrentWeaponIndex}] {current.Name}");
+                    var current = ws.CurrentWeapon;
+                    console.AddToHistory($"Current weapon: [{ws.CurrentWeaponIndex}] {current.Name}");
                     if (current.InfiniteAmmo)
                     {
-                        _console.AddToHistory($"  Ammo: Infinite");
+                        console.AddToHistory($"  Ammo: Infinite");
                     }
                     else if (current.MagazineSize > 0)
                     {
-                        _console.AddToHistory($"  Magazine: {current.MagazineAmmo}/{current.MagazineSize}");
-                        _console.AddToHistory($"  Reserve: {current.CurrentAmmo}/{current.MaxAmmo}");
+                        console.AddToHistory($"  Magazine: {current.MagazineAmmo}/{current.MagazineSize}");
+                        console.AddToHistory($"  Reserve: {current.CurrentAmmo}/{current.MaxAmmo}");
                     }
                     else
                     {
-                        _console.AddToHistory($"  Ammo: {current.CurrentAmmo}/{current.MaxAmmo}");
+                        console.AddToHistory($"  Ammo: {current.CurrentAmmo}/{current.MaxAmmo}");
                     }
-                    _console.AddToHistory($"  Damage: {current.DamagePerRound}");
-                    _console.AddToHistory($"  Fire rate: {current.FireRate:F2}s");
-                    _console.AddToHistory($"  Ammo type: {current.AmmoType}");
-                    _console.AddToHistory("Usage: weapon <0-7>");
+                    console.AddToHistory($"  Damage: {current.DamagePerRound}");
+                    console.AddToHistory($"  Fire rate: {current.FireRate:F2}s");
+                    console.AddToHistory($"  Ammo type: {current.AmmoType}");
+                    console.AddToHistory("Usage: weapon <0-7>");
                     return;
                 }
 
                 if (int.TryParse(args[0], out int weaponIndex))
                 {
-                    if (_weaponSystem.SwitchToWeapon(weaponIndex))
+                    if (ws.SwitchToWeapon(weaponIndex))
                     {
-                        var weapon = _weaponSystem.CurrentWeapon;
-                        _console.AddToHistory($"Switched to: [{weaponIndex}] {weapon.Name}");
+                        var weapon = ws.CurrentWeapon;
+                        console.AddToHistory($"Switched to: [{weaponIndex}] {weapon.Name}");
                     }
                     else
                     {
-                        _console.AddToHistory($"Invalid weapon index: {weaponIndex} (valid: 0-7)");
+                        console.AddToHistory($"Invalid weapon index: {weaponIndex} (valid: 0-7)");
                     }
                 }
                 else
                 {
-                    _console.AddToHistory($"Invalid number: {args[0]}");
+                    console.AddToHistory($"Invalid number: {args[0]}");
                 }
             });
 
-            _console.RegisterCommand("weapons", "List all weapons", args =>
+            console.RegisterCommand("weapons", "List all weapons", args =>
             {
-                _console.AddToHistory("Available weapons:");
+                var ws = _engine.WeaponSystem;
+                console.AddToHistory("Available weapons:");
                 for (int i = 0; i < 8; i++)
                 {
-                    var weapon = _weaponSystem.GetWeapon(i);
+                    var weapon = ws.GetWeapon(i);
                     if (weapon == null) continue;
 
-                    var marker = (i == _weaponSystem.CurrentWeaponIndex) ? ">" : " ";
+                    var marker = (i == ws.CurrentWeaponIndex) ? ">" : " ";
 
                     string ammoStr;
                     if (weapon.InfiniteAmmo)
@@ -449,36 +291,37 @@ namespace GORE.UI
                         ammoStr = $"{weapon.CurrentAmmo}/{weapon.MaxAmmo}";
                     }
 
-                    _console.AddToHistory($"{marker} [{i}] {weapon.Name} - {ammoStr} - {weapon.DamagePerRound}dmg - {weapon.FireRate:F2}s");
+                    console.AddToHistory($"{marker} [{i}] {weapon.Name} - {ammoStr} - {weapon.DamagePerRound}dmg - {weapon.FireRate:F2}s");
                 }
             });
 
-            _console.RegisterCommand("giveammo", "Give ammo to weapon (usage: giveammo <weapon> <amount>)", args =>
+            console.RegisterCommand("giveammo", "Give ammo to weapon (usage: giveammo <weapon> <amount>)", args =>
             {
+                var ws = _engine.WeaponSystem;
                 if (args.Length < 2)
                 {
-                    _console.AddToHistory("Usage: giveammo <weapon> <amount>");
-                    _console.AddToHistory("Example: giveammo 1 50");
+                    console.AddToHistory("Usage: giveammo <weapon> <amount>");
+                    console.AddToHistory("Example: giveammo 1 50");
                     return;
                 }
 
                 if (int.TryParse(args[0], out int weaponIndex) && int.TryParse(args[1], out int amount))
                 {
-                    var weapon = _weaponSystem.GetWeapon(weaponIndex);
+                    var weapon = ws.GetWeapon(weaponIndex);
                     if (weapon != null)
                     {
                         weapon.AddAmmo(amount);
-                        _console.AddToHistory($"Added {amount} ammo to {weapon.Name}");
-                        _console.AddToHistory($"  Ammo: {weapon.CurrentAmmo}/{weapon.MaxAmmo}");
+                        console.AddToHistory($"Added {amount} ammo to {weapon.Name}");
+                        console.AddToHistory($"  Ammo: {weapon.CurrentAmmo}/{weapon.MaxAmmo}");
                     }
                     else
                     {
-                        _console.AddToHistory($"Invalid weapon: {weaponIndex}");
+                        console.AddToHistory($"Invalid weapon: {weaponIndex}");
                     }
                 }
                 else
                 {
-                    _console.AddToHistory("Invalid arguments");
+                    console.AddToHistory("Invalid arguments");
                 }
             });
         }
@@ -491,14 +334,14 @@ namespace GORE.UI
         private T GetConfigValue<T>(string name, T defaultValue)
         {
             // ConfigSystem is guaranteed to be non-null after initialization
-            return _configSystem.GetValue(name, defaultValue);
+            return _engine.ConfigSystem.GetValue(name, defaultValue);
         }
 
         private void UpdateCachedConfigValues()
         {
             // ConfigSystem is guaranteed to be non-null after initialization
-            _hudSystem.SetShowFps(_configSystem.ShowFps);
-            _mouseSensitivity = _configSystem.MouseSensitivity;
+            _engine.HudSystem.SetShowFps(_engine.ConfigSystem.ShowFps);
+            _mouseSensitivity = _engine.ConfigSystem.MouseSensitivity;
         }
 
         private void OnConfigChanged(ConfigVariable variable)
@@ -509,16 +352,16 @@ namespace GORE.UI
         private void OnRenderResolutionChanged(ConfigVariable variable)
         {
             // Resolution change will require renderer recreation
-            _console?.AddToHistory($"{variable.Name} changed to {variable}");
-            _console?.AddToHistory("Resolution changes will take effect on map reload");
+            _engine.GameConsole?.AddToHistory($"{variable.Name} changed to {variable}");
+            _engine.GameConsole?.AddToHistory("Resolution changes will take effect on map reload");
         }
 
         private void InitializeConsole()
         {
-            _console = new GameConsole();
-            _console.SetConfig(_configSystem.GetConfig());
-            _console.OnHistoryChanged += UpdateConsoleDisplay;
-            _console.OnHistoryChanged += UpdateConsoleDisplay;
+            var console = _engine.GameConsole;
+            console.SetConfig(_engine.ConfigSystem.GetConfig());
+            console.OnHistoryChanged += UpdateConsoleDisplay;
+            console.OnHistoryChanged += UpdateConsoleDisplay;
         }
 
         private async System.Threading.Tasks.Task LoadCustomFontAsync()
@@ -611,58 +454,58 @@ namespace GORE.UI
         {
             try
             {
-                _console.AddToHistory($"Loading map: {mapName}...");
+                _engine.GameConsole.AddToHistory($"Loading map: {mapName}...");
                 MapData mapData;
                 try
                 {
-                    mapData = await _mapSystem.LoadMapByNameAsync(mapName);
-                    _console.AddToHistory($"✓ Map '{mapData.Name}' loaded successfully");
+                    mapData = await _engine.MapSystem.LoadMapByNameAsync(mapName);
+                    _engine.GameConsole.AddToHistory($"✓ Map '{mapData.Name}' loaded successfully");
                 }
                 catch (FileNotFoundException)
                 {
-                    _console.AddToHistory($"✗ Map file not found: {mapName}.map");
-                    _console.AddToHistory($"  Searched in: gt1/maps/");
+                    _engine.GameConsole.AddToHistory($"✗ Map file not found: {mapName}.map");
+                    _engine.GameConsole.AddToHistory($"  Searched in: gt1/maps/");
                     return;
                 }
                 catch (Exception ex)
                 {
-                    _console.AddToHistory($"✗ Failed to load map: {ex.Message}");
+                    _engine.GameConsole.AddToHistory($"✗ Failed to load map: {ex.Message}");
                     return;
                 }
 
                 // Verify all texture files exist BEFORE loading
-                _console.AddToHistory("Verifying textures...");
-                var missingTextures = _mapSystem.VerifyTextures(mapData);
+                _engine.GameConsole.AddToHistory("Verifying textures...");
+                var missingTextures = _engine.MapSystem.VerifyTextures(mapData);
                 if (missingTextures.Count > 0)
                 {
-                    _console.AddToHistory("");
-                    _console.AddToHistory("✗ ERROR: Missing required texture files:");
+                    _engine.GameConsole.AddToHistory("");
+                    _engine.GameConsole.AddToHistory("✗ ERROR: Missing required texture files:");
                     foreach (var missing in missingTextures)
                     {
-                        _console.AddToHistory(missing);
+                        _engine.GameConsole.AddToHistory(missing);
                     }
-                    _console.AddToHistory("");
-                    _console.AddToHistory("Map load aborted");
+                    _engine.GameConsole.AddToHistory("");
+                    _engine.GameConsole.AddToHistory("Map load aborted");
                     return;
                 }
-                _console.AddToHistory($"  All {mapData.TextureMapping.Count} textures verified");
+                _engine.GameConsole.AddToHistory($"  All {mapData.TextureMapping.Count} textures verified");
 
                 // Stop the game loop temporarily
                 var wasRunning = _isGameLoopRunning;
                 _isGameLoopRunning = false;
 
                 // Dispose old renderer system
-                _rendererSystem?.Dispose();
+                _engine.RendererSystem?.Dispose();
 
                 // Update raycasting engine with new map
-                _raycastEngine = new RaycastEngine(mapData.Grid, _eventSystem);
-                _raycastEngine.PlayerPosition = mapData.PlayerStart;
+                _engine.RaycastEngine = new RaycastEngine(mapData.Grid, _engine.EventSystem);
+                _engine.RaycastEngine.PlayerPosition = mapData.PlayerStart;
 
                 // Update renderer system with resolution from config
-                int renderWidth = _configSystem.RenderWidth;
-                int renderHeight = _configSystem.RenderHeight;
-                _rendererSystem = new RendererSystem();
-                _rendererSystem.Initialize(renderWidth, renderHeight, _raycastEngine);
+                int renderWidth = _engine.ConfigSystem.RenderWidth;
+                int renderHeight = _engine.ConfigSystem.RenderHeight;
+                _engine.RendererSystem = new RendererSystem();
+                _engine.RendererSystem.Initialize(renderWidth, renderHeight, _engine.RaycastEngine);
 
                 // Reset initialization flags
                 _resourcesInitialized = false;
@@ -671,28 +514,28 @@ namespace GORE.UI
                 // Initialize Win2D resources if canvas is ready
                 if (ViewportCanvas.Device != null)
                 {
-                    _rendererSystem.InitializeResources(ViewportCanvas.Device, (int)ViewportCanvas.Size.Width, (int)ViewportCanvas.Size.Height);
+                    _engine.RendererSystem.InitializeResources(ViewportCanvas.Device, (int)ViewportCanvas.Size.Width, (int)ViewportCanvas.Size.Height);
                     _resourcesInitialized = true;
 
                     // Load textures for the new map
-                    _console.AddToHistory("Loading textures...");
+                    _engine.GameConsole.AddToHistory("Loading textures...");
                     _isLoadingTextures = true; // Set loading flag
                     foreach (var texMapping in mapData.TextureMapping)
                     {
                         try
                         {
-                            await _rendererSystem.LoadTextureAsync(texMapping.Key, texMapping.Value, ViewportCanvas.Device);
+                            await _engine.RendererSystem.LoadTextureAsync(texMapping.Key, texMapping.Value, ViewportCanvas.Device);
                         }
                         catch (Exception ex)
                         {
-                            _console.AddToHistory($"  ✗ FATAL: Failed to load texture {texMapping.Value}: {ex.Message}");
-                            _console.AddToHistory("Map load aborted");
+                            _engine.GameConsole.AddToHistory($"  ✗ FATAL: Failed to load texture {texMapping.Value}: {ex.Message}");
+                            _engine.GameConsole.AddToHistory("Map load aborted");
                             _isLoadingTextures = false;
                             return;
                         }
                     }
                     _isLoadingTextures = false;
-                    _console.AddToHistory($"  ✓ Loaded {mapData.TextureMapping.Count} textures");
+                    _engine.GameConsole.AddToHistory($"  ✓ Loaded {mapData.TextureMapping.Count} textures");
                 }
                 else
                 {
@@ -701,7 +544,7 @@ namespace GORE.UI
                 }
 
                 // Re-register console commands with the new engine instance
-                _console.RegisterGameCommands(_raycastEngine,
+                _engine.GameConsole.RegisterGameCommands(_engine.RaycastEngine,
                     health => _health = health,
                     ammo => _ammo = ammo);
 
@@ -711,12 +554,12 @@ namespace GORE.UI
                     _isGameLoopRunning = true;
                 }
 
-                _console.AddToHistory($"Map loaded: {mapData.Width}x{mapData.Height}");
-                _console.AddToHistory($"Player spawned at ({mapData.PlayerStart.X:F2}, {mapData.PlayerStart.Y:F2})");
+                _engine.GameConsole.AddToHistory($"Map loaded: {mapData.Width}x{mapData.Height}");
+                _engine.GameConsole.AddToHistory($"Player spawned at ({mapData.PlayerStart.X:F2}, {mapData.PlayerStart.Y:F2})");
             }
             catch (Exception ex)
             {
-                _console.AddToHistory($"✗ Unexpected error loading map: {ex.Message}");
+                _engine.GameConsole.AddToHistory($"✗ Unexpected error loading map: {ex.Message}");
                 System.Diagnostics.Debug.WriteLine($"Map load error: {ex}");
             }
         }
@@ -728,23 +571,23 @@ namespace GORE.UI
 
         private void ViewportCanvas_Update(ICanvasAnimatedControl sender, CanvasAnimatedUpdateEventArgs args)
         {
-            if (!_isGameLoopRunning || _rendererSystem == null || _raycastEngine == null)
+            if (!_isGameLoopRunning || _engine.RendererSystem == null || _engine.RaycastEngine == null)
                 return;
 
             // Initialize Win2D resources on first update if needed
-            if (!_resourcesInitialized && _rendererSystem.GetRenderTarget() == null)
+            if (!_resourcesInitialized && _engine.RendererSystem.GetRenderTarget() == null)
             {
                 try
                 {
                     // Initialize render target to match the canvas size to avoid scaling artifacts
-                    _rendererSystem.InitializeResources(sender.Device, (int)sender.Size.Width, (int)sender.Size.Height);
+                    _engine.RendererSystem.InitializeResources(sender.Device, (int)sender.Size.Width, (int)sender.Size.Height);
                     _resourcesInitialized = true;
 
                     // Start loading textures asynchronously
                     if (_pendingTextureMapping != null && !_isLoadingTextures)
                     {
                         _isLoadingTextures = true;
-                            _ = LoadTexturesAsync(sender.Device); // Start loading textures
+                        _ = LoadTexturesAsync(sender.Device); // Start loading textures
                     }
                 }
                 catch (Exception ex)
@@ -772,59 +615,62 @@ namespace GORE.UI
             Vector2 movementInput = Vector2.Zero;
             bool needMove = false;
 
-            if (_inputSystem.MoveForward) { movementInput += _raycastEngine.PlayerDirection; needMove = true; }
-            if (_inputSystem.MoveBackward) { movementInput -= _raycastEngine.PlayerDirection; needMove = true; }
-            if (_inputSystem.StrafeLeft || _inputSystem.StrafeRight)
+            var input = _engine.InputSystem;
+            var raycast = _engine.RaycastEngine;
+            if (input.MoveForward) { movementInput += raycast.PlayerDirection; needMove = true; }
+            if (input.MoveBackward) { movementInput -= raycast.PlayerDirection; needMove = true; }
+            if (input.StrafeLeft || input.StrafeRight)
             {
-                _cachedRightVector = new Vector2(_raycastEngine.PlayerDirection.Y, -_raycastEngine.PlayerDirection.X);
-                if (_inputSystem.StrafeLeft) { movementInput -= _cachedRightVector; needMove = true; }
-                if (_inputSystem.StrafeRight) { movementInput += _cachedRightVector; needMove = true; }
+                _cachedRightVector = new Vector2(raycast.PlayerDirection.Y, -raycast.PlayerDirection.X);
+                if (input.StrafeLeft) { movementInput -= _cachedRightVector; needMove = true; }
+                if (input.StrafeRight) { movementInput += _cachedRightVector; needMove = true; }
             }
 
             if (needMove)
             {
                 movementInput = Vector2.Normalize(movementInput);
-                _raycastEngine.MovePlayer(movementInput, deltaTime);
+                raycast.MovePlayer(movementInput, deltaTime);
             }
 
-            if (_inputSystem.TurnLeft) _raycastEngine.RotatePlayer(2.0f * deltaTime);
-            if (_inputSystem.TurnRight) _raycastEngine.RotatePlayer(-2.0f * deltaTime);
+            if (input.TurnLeft) raycast.RotatePlayer(2.0f * deltaTime);
+            if (input.TurnRight) raycast.RotatePlayer(-2.0f * deltaTime);
 
             // Update doors
-            _raycastEngine?.UpdateDoors(deltaTime);
+            raycast?.UpdateDoors(deltaTime);
 
             // Handle continuous firing
-            if (_inputSystem.FireTriggerHeld)
+            var weaponSystem = _engine.WeaponSystem;
+            var hudSystem = _engine.HudSystem;
+            if (input.FireTriggerHeld)
             {
-                if (_weaponSystem?.TryFire() == true)
+                if (weaponSystem?.TryFire() == true)
                 {
-                    _hudNeedsUpdate = true;
                     // TODO: Add projectile/hitscan logic here
                 }
             }
 
             // Auto-reload when magazine is empty and reserve ammo available
-            if (_weaponSystem?.CurrentWeapon?.NeedsReload() == true)
+            if (weaponSystem?.CurrentWeapon?.NeedsReload() == true)
             {
-                _weaponSystem.Reload();
+                weaponSystem.Reload();
             }
 
             // Update weapon system
-            _weaponSystem?.Update(deltaTime);
+            weaponSystem?.Update(deltaTime);
 
             // Update FPS counter
-            _hudSystem.UpdateFPS(deltaTime);
+            hudSystem.UpdateFPS(deltaTime);
 
             // Update HUD (less frequently to save performance)
             if (_frameCount % 5 == 0) // Update HUD every 5 frames
             {
                 // Health
-                _hudSystem.UpdateHealth(_health);
+                hudSystem.UpdateHealth(_health);
                 // Ammo
                 string ammoStr;
-                if (_weaponSystem != null)
+                if (weaponSystem != null)
                 {
-                    var weapon = _weaponSystem.CurrentWeapon;
+                    var weapon = weaponSystem.CurrentWeapon;
                     if (weapon.InfiniteAmmo)
                         ammoStr = "∞";
                     else if (weapon.MagazineSize > 0)
@@ -836,11 +682,11 @@ namespace GORE.UI
                 {
                     ammoStr = _ammo.ToString();
                 }
-                _hudSystem.UpdateAmmo(ammoStr);
+                hudSystem.UpdateAmmo(ammoStr);
 
-                if (_hudSystem.NeedsUpdate)
+                if (hudSystem.NeedsUpdate)
                 {
-                    _hudSystem.ResetNeedsUpdate();
+                    hudSystem.ResetNeedsUpdate();
                     DispatcherQueue.TryEnqueue(_updateHudAction);
                 }
             }
@@ -864,7 +710,7 @@ namespace GORE.UI
                 {
                     try
                     {
-                        await _rendererSystem.LoadTextureAsync(texMapping.Key, texMapping.Value, device);
+                        await _engine.RendererSystem.LoadTextureAsync(texMapping.Key, texMapping.Value, device);
                     }
                     catch (Exception ex)
                     {
@@ -893,7 +739,7 @@ namespace GORE.UI
 
                 // Load weapon sprites
                 System.Diagnostics.Debug.WriteLine("Loading weapon sprites...");
-                await _weaponSystem.LoadWeaponSpritesAsync(device);
+                await _engine.WeaponSystem.LoadWeaponSpritesAsync(device);
                 System.Diagnostics.Debug.WriteLine("✓ Weapon sprites loaded");
 
                 _isLoadingTextures = false;
@@ -922,7 +768,7 @@ namespace GORE.UI
         private void ViewportCanvas_Draw(ICanvasAnimatedControl sender, CanvasAnimatedDrawEventArgs args)
         {
                 // Don't render if resources aren't initialized or textures are still loading
-            if (_rendererSystem == null || _rendererSystem.GetRenderTarget() == null || _isLoadingTextures)
+            if (_engine.RendererSystem == null || _engine.RendererSystem.GetRenderTarget() == null || _isLoadingTextures)
             {
                 // Draw loading screen
                 args.DrawingSession.Clear(Windows.UI.Color.FromArgb(255, 0, 0, 0));
@@ -932,10 +778,10 @@ namespace GORE.UI
             try
             {
                 // Render the 3D scene, scaled to fill the canvas
-                _rendererSystem.Render(args.DrawingSession, (float)sender.Size.Width, (float)sender.Size.Height);
+                _engine.RendererSystem.Render(args.DrawingSession, (float)sender.Size.Width, (float)sender.Size.Height);
 
                 // Render weapon sprite on top
-                _weaponSystem?.Render(args.DrawingSession, (float)sender.Size.Width, (float)sender.Size.Height);
+                _engine.WeaponSystem?.Render(args.DrawingSession, (float)sender.Size.Width, (float)sender.Size.Height);
             }
             catch (Exception ex)
             {
@@ -974,7 +820,7 @@ namespace GORE.UI
             }
 
             // Delegate to input system
-            _inputSystem.HandleKey(e.Key, true);
+            _engine.InputSystem.HandleKey(e.Key, true);
             e.Handled = true;
         }
 
@@ -994,7 +840,7 @@ namespace GORE.UI
             }
 
             // Delegate to input system
-            _inputSystem.HandleKey(e.Key, false);
+            _engine.InputSystem.HandleKey(e.Key, false);
             e.Handled = true;
         }
 
@@ -1057,22 +903,23 @@ namespace GORE.UI
                 e.Handled = true;
                 return;
             }
+            var console = _engine.GameConsole;
             if (e.Key == VirtualKey.Enter)
             {
                 var input = ConsoleInput.Text;
                 ConsoleInput.Text = string.Empty;
-                _console.ExecuteCommand(input);
+                console.ExecuteCommand(input);
                 e.Handled = true;
             }
             else if (e.Key == VirtualKey.Up)
             {
-                ConsoleInput.Text = _console.GetPreviousCommand();
+                ConsoleInput.Text = console.GetPreviousCommand();
                 ConsoleInput.SelectionStart = ConsoleInput.Text.Length;
                 e.Handled = true;
             }
             else if (e.Key == VirtualKey.Down)
             {
-                ConsoleInput.Text = _console.GetNextCommand();
+                ConsoleInput.Text = console.GetNextCommand();
                 ConsoleInput.SelectionStart = ConsoleInput.Text.Length;
                 e.Handled = true;
             }
@@ -1091,7 +938,7 @@ namespace GORE.UI
         private void HandleKeyInput(VirtualKey key, bool isPressed)
         {
             // Delegate continuous/hold input to InputSystem
-            _inputSystem?.HandleKey(key, isPressed);
+            _engine.InputSystem?.HandleKey(key, isPressed);
 
             // Only handle one-shot actions on key press
             if (!isPressed) return;
@@ -1100,7 +947,7 @@ namespace GORE.UI
             {
                 case VirtualKey.Space:
                     // Try to interact with door
-                    bool doorFound = _raycastEngine?.TryInteractWithDoor() == true;
+                    bool doorFound = _engine.RaycastEngine?.TryInteractWithDoor() == true;
                     if (doorFound)
                     {
                         System.Diagnostics.Debug.WriteLine("Door interaction triggered!");
@@ -1108,14 +955,13 @@ namespace GORE.UI
                     }
                     else
                     {
-                        System.Diagnostics.Debug.WriteLine($"No door found near player at ({_raycastEngine?.PlayerPosition.X:F2}, {_raycastEngine?.PlayerPosition.Y:F2})");
+                        System.Diagnostics.Debug.WriteLine($"No door found near player at ({_engine.RaycastEngine?.PlayerPosition.X:F2}, {_engine.RaycastEngine?.PlayerPosition.Y:F2})");
                     }
                     break;
 
                 case VirtualKey.R:
-                    _weaponSystem?.Reload();
+                    _engine.WeaponSystem?.Reload();
                     break;
-
 
                 case VirtualKey.Escape:
                     if (_consoleVisible)
@@ -1125,9 +971,9 @@ namespace GORE.UI
                     else
                     {
                         _isGameLoopRunning = false;
-                        _configSystem?.Save();
-                        _rendererSystem?.Dispose();
-                        _weaponSystem?.Dispose();
+                        _engine.ConfigSystem?.Save();
+                        _engine.RendererSystem?.Dispose();
+                        _engine.WeaponSystem?.Dispose();
                         Close();
                     }
                     break;
@@ -1143,7 +989,7 @@ namespace GORE.UI
             }
 
             // Use StringBuilder to reduce string allocations
-            var history = _console.History;
+            var history = _engine.GameConsole.History;
             if (history.Count == 0)
             {
                 ConsoleHistoryText.Text = string.Empty;

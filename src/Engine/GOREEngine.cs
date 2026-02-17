@@ -1,6 +1,11 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Windowing;
 using WinRT.Interop;
+using System;
+using System.Threading.Tasks;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Windowing;
+using WinRT.Interop;
 
 namespace GORE.Engine
 {
@@ -12,20 +17,13 @@ namespace GORE.Engine
         private static bool _initialized = false;
 
         /// <summary>
-        /// Initialize and start the GORE Engine.
-        /// Call this from your App.xaml.cs OnLaunched method.
+        /// Create and initialize a new GOREEngineInstance.
         /// </summary>
-        public static async System.Threading.Tasks.Task StartAsync()
+        public static async Task<GOREEngineInstance> CreateAndInitializeAsync(Action<string> log, Action<string> logError)
         {
-            if (_initialized) return;
-
-            // Launch the 3D game window directly
-            var gameWindow = new UI.GameWindow();
-            gameWindow.Activate();
-
-            _initialized = true;
-
-            await System.Threading.Tasks.Task.CompletedTask;
+            var instance = new GOREEngineInstance();
+            var ok = await instance.InitializeAsync(log, logError);
+            return ok ? instance : null;
         }
     }
 }
