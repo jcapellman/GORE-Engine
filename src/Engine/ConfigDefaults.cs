@@ -3,6 +3,14 @@ namespace GORE.Engine
     // Central place for default config values and safe ranges
     public static class ConfigDefaults
     {
+        // Config keys
+        public const string KeyRenderWidth = "r_width";
+        public const string KeyRenderHeight = "r_height";
+        public const string KeyFov = "r_fov";
+        public const string KeyMouseSensitivity = "m_sensitivity";
+        public const string KeyMaxFps = "r_maxfps";
+        public const string KeyShowFps = "r_showfps";
+
         // Resolution defaults
         public const int DefaultRenderWidth = 640;
         public const int DefaultRenderHeight = 480;

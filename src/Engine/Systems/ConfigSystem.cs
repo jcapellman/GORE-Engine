@@ -24,14 +24,14 @@ namespace GORE.Engine
             return _config.GetValue(name, defaultValue);
         }
 
-        public bool ShowFps => GetValue("r_showfps", ConfigDefaults.DefaultShowFps);
-        public float MouseSensitivity => GetValue("m_sensitivity", ConfigDefaults.DefaultMouseSensitivity);
+        public bool ShowFps => GetValue(ConfigDefaults.KeyShowFps, ConfigDefaults.DefaultShowFps);
+        public float MouseSensitivity => GetValue(ConfigDefaults.KeyMouseSensitivity, ConfigDefaults.DefaultMouseSensitivity);
 
         // Typed convenience properties
-        public int RenderWidth => GetValue("r_width", ConfigDefaults.DefaultRenderWidth);
-        public int RenderHeight => GetValue("r_height", ConfigDefaults.DefaultRenderHeight);
-        public float Fov => GetValue("r_fov", ConfigDefaults.DefaultFov);
-        public int MaxFps => GetValue("r_maxfps", ConfigDefaults.DefaultMaxFps);
+        public int RenderWidth => GetValue(ConfigDefaults.KeyRenderWidth, ConfigDefaults.DefaultRenderWidth);
+        public int RenderHeight => GetValue(ConfigDefaults.KeyRenderHeight, ConfigDefaults.DefaultRenderHeight);
+        public float Fov => GetValue(ConfigDefaults.KeyFov, ConfigDefaults.DefaultFov);
+        public int MaxFps => GetValue(ConfigDefaults.KeyMaxFps, ConfigDefaults.DefaultMaxFps);
 
         public event Action ConfigValuesUpdated;
         public event Action<int,int> RenderResolutionChanged;
@@ -41,11 +41,11 @@ namespace GORE.Engine
             if (_config == null) return;
 
             // Validate and clamp critical config values to safe ranges
-            ValidateConfigValue("r_width", ConfigDefaults.MinRenderWidth, ConfigDefaults.MaxRenderWidth, ConfigDefaults.DefaultRenderWidth);
-            ValidateConfigValue("r_height", ConfigDefaults.MinRenderHeight, ConfigDefaults.MaxRenderHeight, ConfigDefaults.DefaultRenderHeight);
-            ValidateConfigValue("r_fov", ConfigDefaults.MinFov, ConfigDefaults.MaxFov, ConfigDefaults.DefaultFov);
-            ValidateConfigValue("m_sensitivity", ConfigDefaults.MinMouseSensitivity, ConfigDefaults.MaxMouseSensitivity, ConfigDefaults.DefaultMouseSensitivity);
-            ValidateConfigValue("r_maxfps", ConfigDefaults.MinMaxFps, ConfigDefaults.MaxMaxFps, ConfigDefaults.DefaultMaxFps);
+            ValidateConfigValue(ConfigDefaults.KeyRenderWidth, ConfigDefaults.MinRenderWidth, ConfigDefaults.MaxRenderWidth, ConfigDefaults.DefaultRenderWidth);
+            ValidateConfigValue(ConfigDefaults.KeyRenderHeight, ConfigDefaults.MinRenderHeight, ConfigDefaults.MaxRenderHeight, ConfigDefaults.DefaultRenderHeight);
+            ValidateConfigValue(ConfigDefaults.KeyFov, ConfigDefaults.MinFov, ConfigDefaults.MaxFov, ConfigDefaults.DefaultFov);
+            ValidateConfigValue(ConfigDefaults.KeyMouseSensitivity, ConfigDefaults.MinMouseSensitivity, ConfigDefaults.MaxMouseSensitivity, ConfigDefaults.DefaultMouseSensitivity);
+            ValidateConfigValue(ConfigDefaults.KeyMaxFps, ConfigDefaults.MinMaxFps, ConfigDefaults.MaxMaxFps, ConfigDefaults.DefaultMaxFps);
         }
 
         private void ValidateConfigValue<T>(string name, T min, T max, T defaultValue) where T : IComparable
@@ -72,10 +72,10 @@ namespace GORE.Engine
         {
             if (_config == null) return;
 
-            var renderWidthVar = _config.Get("r_width");
-            var renderHeightVar = _config.Get("r_height");
-            var showFpsVar = _config.Get("r_showfps");
-            var mouseSensitivityVar = _config.Get("m_sensitivity");
+            var renderWidthVar = _config.Get(ConfigDefaults.KeyRenderWidth);
+            var renderHeightVar = _config.Get(ConfigDefaults.KeyRenderHeight);
+            var showFpsVar = _config.Get(ConfigDefaults.KeyShowFps);
+            var mouseSensitivityVar = _config.Get(ConfigDefaults.KeyMouseSensitivity);
 
             if (renderWidthVar != null && onRenderResolutionChanged != null)
                 renderWidthVar.OnChanged += onRenderResolutionChanged;

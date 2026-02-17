@@ -492,7 +492,7 @@ namespace GORE.UI
         /// </summary>
         private T GetConfigValue<T>(string name, T defaultValue)
         {
-            if (_configSystem == null) return defaultValue;
+            // ConfigSystem is guaranteed to be non-null after initialization
             return _configSystem.GetValue(name, defaultValue);
         }
 
