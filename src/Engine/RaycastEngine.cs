@@ -20,12 +20,15 @@ namespace GORE.Engine
         public Vector2 PlayerDirection { get; set; }
         public Vector2 CameraPlane { get; set; }
 
-        public RaycastEngine(int[,] worldMap)
+        private readonly EventSystem _eventSystem;
+
+        public RaycastEngine(int[,] worldMap, EventSystem eventSystem = null)
         {
             _worldMap = worldMap;
             _mapHeight = worldMap.GetLength(0);
             _mapWidth = worldMap.GetLength(1);
             _doors = new Dictionary<(int, int), DoorState>();
+            _eventSystem = eventSystem;
 
             // Find all doors in the map and initialize their state
             for (int y = 0; y < _mapHeight; y++)
@@ -274,7 +277,10 @@ namespace GORE.Engine
 
             // Check the cell in front
             if (TryActivateDoorAtPosition(checkX, checkY))
+            {
+                _eventSystem?.Publish(new DoorInteractedEvent());
                 return true;
+            }
 
             // Also check adjacent cells in case player isn't perfectly aligned
             // Check player's current cell
@@ -282,7 +288,10 @@ namespace GORE.Engine
             int playerY = (int)PlayerPosition.Y;
 
             if (TryActivateDoorAtPosition(playerX, playerY))
+            {
+                _eventSystem?.Publish(new DoorInteractedEvent());
                 return true;
+            }
 
             // Check cells in a 3x3 grid around player
             for (int dy = -1; dy <= 1; dy++)
@@ -299,7 +308,10 @@ namespace GORE.Engine
                     if (dist <= reachDistance)
                     {
                         if (TryActivateDoorAtPosition(testX, testY))
+                        {
+                            _eventSystem?.Publish(new DoorInteractedEvent());
                             return true;
+                        }
                     }
                 }
             }

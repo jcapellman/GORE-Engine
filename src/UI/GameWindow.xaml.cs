@@ -92,12 +92,19 @@ namespace GORE.UI
             // Pointer press handler for dismissing fatal init errors
             RootGrid.PointerPressed += RootGrid_PointerPressed;
 
+
+            // Initialize EventSystem
+            _eventSystem = new EventSystem();
+
             // Initialize InputSystem and wire up weapon cycling
             _inputSystem = new InputSystem();
             _inputSystem.PreviousWeaponRequested += () => _weaponSystem?.PreviousWeapon();
             _inputSystem.NextWeaponRequested += () => _weaponSystem?.NextWeapon();
             _inputSystem.WeaponNumberKeyPressed += idx => _weaponSystem?.SwitchToWeapon(idx);
             // Weapon system will be initialized later; defer wiring until after subsystems created
+
+            // Subscribe to door event for sound
+            _eventSystem.Subscribe<DoorInteractedEvent>(_ => _sfxSystem?.Play("door"));
 
             // Start initialization sequence
             _ = RunInitializationSequenceAsync();
@@ -234,7 +241,7 @@ namespace GORE.UI
                 // Initialize raycasting engine
                 LogInit("Initializing raycasting engine...");
                 var map = _mapSystem.CurrentMap;
-                _raycastEngine = new RaycastEngine(map.Grid);
+                _raycastEngine = new RaycastEngine(map.Grid, _eventSystem);
                 _raycastEngine.PlayerPosition = map.PlayerStart;
                 LogInit($"  Player spawned at ({map.PlayerStart.X:F2}, {map.PlayerStart.Y:F2})");
 
@@ -616,15 +623,11 @@ namespace GORE.UI
         {
             try
             {
-                var baseDirectory = AppContext.BaseDirectory;
-                var mapPath = System.IO.Path.Combine(baseDirectory, "gt1", "maps", $"{mapName}.map");
-
                 _console.AddToHistory($"Loading map: {mapName}...");
-
                 MapData mapData;
                 try
                 {
-                    mapData = await MapLoader.LoadMapAsync(mapPath);
+                    mapData = await _mapSystem.LoadMapByNameAsync(mapName);
                     _console.AddToHistory($"✓ Map '{mapData.Name}' loaded successfully");
                 }
                 catch (FileNotFoundException)
@@ -641,16 +644,7 @@ namespace GORE.UI
 
                 // Verify all texture files exist BEFORE loading
                 _console.AddToHistory("Verifying textures...");
-                var missingTextures = new List<string>();
-                foreach (var texMapping in mapData.TextureMapping)
-                {
-                    var texturePath = Path.Combine(baseDirectory, texMapping.Value);
-                    if (!File.Exists(texturePath))
-                    {
-                        missingTextures.Add($"  Texture {texMapping.Key}: {texMapping.Value}");
-                    }
-                }
-
+                var missingTextures = _mapSystem.VerifyTextures(mapData);
                 if (missingTextures.Count > 0)
                 {
                     _console.AddToHistory("");
@@ -663,7 +657,6 @@ namespace GORE.UI
                     _console.AddToHistory("Map load aborted");
                     return;
                 }
-
                 _console.AddToHistory($"  All {mapData.TextureMapping.Count} textures verified");
 
                 // Stop the game loop temporarily
@@ -674,7 +667,7 @@ namespace GORE.UI
                 _rendererSystem?.Dispose();
 
                 // Update raycasting engine with new map
-                _raycastEngine = new RaycastEngine(mapData.Grid);
+                _raycastEngine = new RaycastEngine(mapData.Grid, _eventSystem);
                 _raycastEngine.PlayerPosition = mapData.PlayerStart;
 
                 // Update renderer system with resolution from config
@@ -695,7 +688,7 @@ namespace GORE.UI
 
                     // Load textures for the new map
                     _console.AddToHistory("Loading textures...");
-                            _isLoadingTextures = true; // Set loading flag
+                    _isLoadingTextures = true; // Set loading flag
                     foreach (var texMapping in mapData.TextureMapping)
                     {
                         try
@@ -1169,7 +1162,7 @@ namespace GORE.UI
                     if (doorFound)
                     {
                         System.Diagnostics.Debug.WriteLine("Door interaction triggered!");
-                        _sfxSystem?.Play("door");
+                        // Sound is now handled by RaycastEngine event
                     }
                     else
                     {
