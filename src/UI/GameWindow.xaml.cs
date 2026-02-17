@@ -43,30 +43,18 @@ namespace GORE.UI
         private SoundEffectSystem _sfxSystem;
         private MusicSystem _musicSystem;
 
-        // FPS tracking
-        private int _frameCount = 0;
-        private double _fpsAccumulator = 0.0;
-        private int _fpsFrameCount = 0;
-        private int _lastFps = 0;
-
         // Delta time smoothing
         private float _lastDeltaTime = 0.016f;
         private const float MAX_DELTA_TIME = 0.05f; // Cap at 50ms (20 FPS minimum)
 
         // Cached config values (updated when config changes)
-        private bool _showFps = true;
         private float _mouseSensitivity = 0.002f;
 
         // Cached vectors to reduce allocations
         private Vector2 _cachedRightVector;
 
-        // Cached HUD strings to reduce allocations
-        private string _cachedHealthText = "100";
-        private string _cachedAmmoText = "50";
-        private string _cachedFpsText = "60fps";
-        private bool _hudNeedsUpdate = true;
-
-        // Cached dispatcher action to avoid lambda allocations
+        // HUD system
+        private HudSystem _hudSystem;
         private Microsoft.UI.Dispatching.DispatcherQueueHandler _updateHudAction;
 
         public GameWindow()
@@ -76,17 +64,17 @@ namespace GORE.UI
 
             
 
-            // Initialize cached dispatcher action
+            // Initialize HUD system
+            _hudSystem = new HudSystem();
             _updateHudAction = () =>
             {
-                HealthText.Text = _cachedHealthText;
-                AmmoText.Text = _cachedAmmoText;
-                FpsText.Visibility = _showFps ? Visibility.Visible : Visibility.Collapsed;
-                if (_showFps)
+                HealthText.Text = _hudSystem.HealthText;
+                AmmoText.Text = _hudSystem.AmmoText;
+                FpsText.Visibility = _hudSystem.ShowFps ? Visibility.Visible : Visibility.Collapsed;
+                if (_hudSystem.ShowFps)
                 {
-                    FpsText.Text = _cachedFpsText;
+                    FpsText.Text = _hudSystem.FpsText;
                 }
-
             };
 
             // Pointer press handler for dismissing fatal init errors
@@ -509,7 +497,7 @@ namespace GORE.UI
         private void UpdateCachedConfigValues()
         {
             // ConfigSystem is guaranteed to be non-null after initialization
-            _showFps = _configSystem.ShowFps;
+            _hudSystem.SetShowFps(_configSystem.ShowFps);
             _mouseSensitivity = _configSystem.MouseSensitivity;
         }
 
@@ -825,12 +813,36 @@ namespace GORE.UI
             _weaponSystem?.Update(deltaTime);
 
             // Update FPS counter
-            UpdateFPS(deltaTime);
+            _hudSystem.UpdateFPS(deltaTime);
 
             // Update HUD (less frequently to save performance)
             if (_frameCount % 5 == 0) // Update HUD every 5 frames
             {
-                UpdateHUD();
+                // Health
+                _hudSystem.UpdateHealth(_health);
+                // Ammo
+                string ammoStr;
+                if (_weaponSystem != null)
+                {
+                    var weapon = _weaponSystem.CurrentWeapon;
+                    if (weapon.InfiniteAmmo)
+                        ammoStr = "∞";
+                    else if (weapon.MagazineSize > 0)
+                        ammoStr = weapon.MagazineAmmo.ToString();
+                    else
+                        ammoStr = weapon.CurrentAmmo.ToString();
+                }
+                else
+                {
+                    ammoStr = _ammo.ToString();
+                }
+                _hudSystem.UpdateAmmo(ammoStr);
+
+                if (_hudSystem.NeedsUpdate)
+                {
+                    _hudSystem.ResetNeedsUpdate();
+                    DispatcherQueue.TryEnqueue(_updateHudAction);
+                }
             }
 
             _frameCount++;
@@ -936,76 +948,6 @@ namespace GORE.UI
             // Now handled inline in the update loop via InputSystem
         }
 
-        private void UpdateFPS(float deltaTime)
-        {
-            if (_showFps)
-            {
-                _fpsFrameCount++;
-                _fpsAccumulator += deltaTime;
-
-                // Update FPS display once per second
-                if (_fpsAccumulator >= 1.0)
-                {
-                    _lastFps = (int)(_fpsFrameCount / _fpsAccumulator);
-                    _fpsFrameCount = 0;
-                    _fpsAccumulator = 0.0;
-
-                    // Cache the FPS string to avoid allocations during HUD update
-                    _cachedFpsText = $"{_lastFps}fps";
-                    _hudNeedsUpdate = true;
-                }
-            }
-        }
-
-        private void UpdateHUD()
-        {
-            // Only update cached strings if values have changed
-            bool healthChanged = false;
-            bool ammoChanged = false;
-
-            var healthStr = _health.ToString();
-            if (_cachedHealthText != healthStr)
-            {
-                _cachedHealthText = healthStr;
-                healthChanged = true;
-            }
-
-            // Show current weapon's magazine ammo (or total if no magazine system)
-            string ammoStr;
-            if (_weaponSystem != null)
-            {
-                var weapon = _weaponSystem.CurrentWeapon;
-                if (weapon.InfiniteAmmo)
-                {
-                    ammoStr = "∞";
-                }
-                else if (weapon.MagazineSize > 0)
-                {
-                    ammoStr = weapon.MagazineAmmo.ToString();
-                }
-                else
-                {
-                    ammoStr = weapon.CurrentAmmo.ToString();
-                }
-            }
-            else
-            {
-                ammoStr = _ammo.ToString();
-            }
-
-            if (_cachedAmmoText != ammoStr)
-            {
-                _cachedAmmoText = ammoStr;
-                ammoChanged = true;
-            }
-
-            // Only marshal to UI thread if something changed
-            if (healthChanged || ammoChanged || _hudNeedsUpdate)
-            {
-                _hudNeedsUpdate = false;
-                DispatcherQueue.TryEnqueue(_updateHudAction);
-            }
-        }
 
         private void RootGrid_KeyDown(object sender, KeyRoutedEventArgs e)
         {
