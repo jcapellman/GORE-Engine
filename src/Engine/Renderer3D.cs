@@ -30,9 +30,20 @@ namespace GORE.Engine
             _raycastEngine = raycastEngine;
         }
 
+        // Initialize or recreate the render target. Accept explicit size so the render target
+        // can match the output canvas resolution and avoid scaling artifacts.
+        public void InitializeResources(CanvasDevice device, int width, int height)
+        {
+            // Dispose previous render target if any
+            _renderTarget?.Dispose();
+            _renderTarget = new CanvasRenderTarget(device, width, height, 96);
+        }
+
+        // Backwards-compatible overload: initialize using the configured logical screen
+        // resolution (the renderer's `r_width` / `r_height` settings).
         public void InitializeResources(CanvasDevice device)
         {
-            _renderTarget = new CanvasRenderTarget(device, _screenWidth, _screenHeight, 96);
+            InitializeResources(device, _screenWidth, _screenHeight);
         }
 
         public CanvasRenderTarget GetRenderTarget() => _renderTarget;
@@ -80,17 +91,21 @@ namespace GORE.Engine
 
             using (var ds = _renderTarget.CreateDrawingSession())
             {
+                // Use the actual render-target pixel size so rendering covers the full target.
+                int rtWidth = (int)_renderTarget.SizeInPixels.Width;
+                int rtHeight = (int)_renderTarget.SizeInPixels.Height;
+
                 // Clear screen with ceiling and floor colors
                 ds.Clear(Color.FromArgb(255, 64, 64, 64)); // Dark gray ceiling
 
                 // Draw floor
-                ds.FillRectangle(0, _screenHeight / 2, _screenWidth, _screenHeight / 2, 
+                ds.FillRectangle(0, rtHeight / 2, rtWidth, rtHeight / 2,
                     Color.FromArgb(255, 32, 32, 32));
 
                 // Raycast for each vertical stripe
-                for (int x = 0; x < _screenWidth; x++)
+                for (int x = 0; x < rtWidth; x++)
                 {
-                    var hit = _raycastEngine.CastRay(x, _screenWidth);
+                    var hit = _raycastEngine.CastRay(x, rtWidth);
 
                     // Skip if no wall was hit
                     if (hit.WallType == 0)
@@ -107,12 +122,12 @@ namespace GORE.Engine
                             continue;
                     }
 
-                    // Calculate line height
-                    int lineHeight = (int)(_screenHeight / hit.Distance);
+                    // Calculate line height using the render-target height
+                    int lineHeight = (int)(rtHeight / hit.Distance);
 
                     // Calculate lowest and highest pixel to fill in current stripe
-                    int drawStart = Math.Max(0, -lineHeight / 2 + _screenHeight / 2);
-                    int drawEnd = Math.Min(_screenHeight - 1, lineHeight / 2 + _screenHeight / 2);
+                    int drawStart = Math.Max(0, -lineHeight / 2 + rtHeight / 2);
+                    int drawEnd = Math.Min(rtHeight - 1, lineHeight / 2 + rtHeight / 2);
 
                     // Draw textured wall - throw error if texture is missing
                     if (!_textures.ContainsKey(hit.WallType))
@@ -124,9 +139,14 @@ namespace GORE.Engine
                 }
             }
 
-            // Scale the render target to fill the entire canvas
+            // Scale the render target to fill the entire canvas.
+            // Use nearest-neighbor interpolation to avoid sampling/warping artifacts
+            // when the render target is scaled up (common in raycasters with 1px-wide stripes).
             var destRect = new Windows.Foundation.Rect(0, 0, canvasWidth, canvasHeight);
-            drawingSession.DrawImage(_renderTarget, destRect);
+            // Draw the full render target to the output canvas. Provide an explicit source rect
+            // (the full render target) so we can specify opacity and nearest-neighbor interpolation.
+            var sourceRect = new Windows.Foundation.Rect(0, 0, _renderTarget.SizeInPixels.Width, _renderTarget.SizeInPixels.Height);
+            drawingSession.DrawImage(_renderTarget, destRect, sourceRect, 1.0f, CanvasImageInterpolation.NearestNeighbor);
         }
 
                         private void DrawTexturedWallWin2D(CanvasDrawingSession ds, int screenX, int drawStart, int drawEnd, RaycastHit hit, DoorState doorState = null)
@@ -187,11 +207,11 @@ namespace GORE.Engine
                             {
                                 // Use cached tint effect instead of creating new one
                                 var tintEffect = _tintEffects[hit.WallType];
-                                ds.DrawImage(tintEffect, destRect, sourceRect);
+                                ds.DrawImage(tintEffect, destRect, sourceRect, 1.0f, CanvasImageInterpolation.NearestNeighbor);
                             }
                             else
                             {
-                                ds.DrawImage(texture, destRect, sourceRect);
+                                ds.DrawImage(texture, destRect, sourceRect, 1.0f, CanvasImageInterpolation.NearestNeighbor);
                             }
                         }
 

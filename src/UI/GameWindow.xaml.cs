@@ -675,7 +675,7 @@ namespace GORE.UI
                 // Initialize Win2D resources if canvas is ready
                 if (ViewportCanvas.Device != null)
                 {
-                    _renderer.InitializeResources(ViewportCanvas.Device);
+                    _renderer.InitializeResources(ViewportCanvas.Device, (int)ViewportCanvas.Size.Width, (int)ViewportCanvas.Size.Height);
                     _resourcesInitialized = true;
 
                     // Load textures for the new map
@@ -740,7 +740,8 @@ namespace GORE.UI
             {
                 try
                 {
-                    _renderer.InitializeResources(sender.Device);
+                    // Initialize render target to match the canvas size to avoid scaling artifacts
+                    _renderer.InitializeResources(sender.Device, (int)sender.Size.Width, (int)sender.Size.Height);
                     _resourcesInitialized = true;
 
                     // Start loading textures asynchronously
