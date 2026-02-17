@@ -94,6 +94,9 @@ namespace GORE.UI
 
             // Initialize InputSystem and wire up weapon cycling
             _inputSystem = new InputSystem();
+            _inputSystem.PreviousWeaponRequested += () => _weaponSystem?.PreviousWeapon();
+            _inputSystem.NextWeaponRequested += () => _weaponSystem?.NextWeapon();
+            _inputSystem.WeaponNumberKeyPressed += idx => _weaponSystem?.SwitchToWeapon(idx);
             // Weapon system will be initialized later; defer wiring until after subsystems created
 
             // Start initialization sequence
@@ -1178,21 +1181,6 @@ namespace GORE.UI
                     _weaponSystem?.Reload();
                     break;
 
-                case VirtualKey.Number1: _weaponSystem?.SwitchToWeapon(0); break;
-                case VirtualKey.Number2: _weaponSystem?.SwitchToWeapon(1); break;
-                case VirtualKey.Number3: _weaponSystem?.SwitchToWeapon(2); break;
-                case VirtualKey.Number4: _weaponSystem?.SwitchToWeapon(3); break;
-                case VirtualKey.Number5: _weaponSystem?.SwitchToWeapon(4); break;
-                case VirtualKey.Number6: _weaponSystem?.SwitchToWeapon(5); break;
-                case VirtualKey.Number7: _weaponSystem?.SwitchToWeapon(6); break;
-                case VirtualKey.Number8: _weaponSystem?.SwitchToWeapon(7); break;
-
-                case VirtualKey.Q:
-                    _weaponSystem?.PreviousWeapon();
-                    break;
-                case VirtualKey.E:
-                    _weaponSystem?.NextWeapon();
-                    break;
 
                 case VirtualKey.Escape:
                     if (_consoleVisible)

@@ -24,12 +24,27 @@ namespace GORE.Engine
                 case VirtualKey.Left: TurnLeft = isPressed; break;
                 case VirtualKey.Right: TurnRight = isPressed; break;
                 case VirtualKey.Control: FireTriggerHeld = isPressed; break;
-                case VirtualKey.Q: if (isPressed) PreviousWeaponRequested?.Invoke(); break;
-                case VirtualKey.E: if (isPressed) NextWeaponRequested?.Invoke(); break;
+                case VirtualKey.Q:
+                    if (isPressed) PreviousWeaponRequested?.Invoke();
+                    break;
+                case VirtualKey.E:
+                    if (isPressed) NextWeaponRequested?.Invoke();
+                    break;
+                case VirtualKey.Number1:
+                case VirtualKey.Number2:
+                case VirtualKey.Number3:
+                case VirtualKey.Number4:
+                case VirtualKey.Number5:
+                case VirtualKey.Number6:
+                case VirtualKey.Number7:
+                case VirtualKey.Number8:
+                    if (isPressed) WeaponNumberKeyPressed?.Invoke((int)key - (int)VirtualKey.Number1);
+                    break;
             }
         }
 
         public System.Action PreviousWeaponRequested;
         public System.Action NextWeaponRequested;
+        public System.Action<int> WeaponNumberKeyPressed;
     }
 }
