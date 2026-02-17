@@ -7,15 +7,7 @@ using System.Threading.Tasks;
 
 namespace GORE.Engine
 {
-    public class MapData
-    {
-        public int[,] Grid { get; set; }
-        public Vector2 PlayerStart { get; set; }
-        public Dictionary<int, string> TextureMapping { get; set; }
-        public string Name { get; set; } = "Unnamed Level";
-        public int Width { get; set; }
-        public int Height { get; set; }
-    }
+    // MapData moved to src/Engine/Data/MapData.cs
 
     public class MapLoader
     {
