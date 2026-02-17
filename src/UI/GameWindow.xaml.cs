@@ -27,6 +27,10 @@ namespace GORE.UI
         private bool _isLoadingTextures;
         private bool _resourcesInitialized;
         private System.Text.StringBuilder _initLog;
+        
+        // If a critical error occurs during initialization, set this to true
+        // and wait for the user to press any key or click before exiting.
+        private bool _criticalInitError;
 
         private bool _moveForward;
         private bool _moveBackward;
@@ -72,6 +76,8 @@ namespace GORE.UI
             InitializeComponent();
             _initLog = new System.Text.StringBuilder();
 
+            
+
             // Initialize cached dispatcher action
             _updateHudAction = () =>
             {
@@ -82,10 +88,23 @@ namespace GORE.UI
                 {
                     FpsText.Text = _cachedFpsText;
                 }
+
             };
+
+            // Pointer press handler for dismissing fatal init errors
+            RootGrid.PointerPressed += RootGrid_PointerPressed;
 
             // Start initialization sequence
             _ = RunInitializationSequenceAsync();
+        }
+
+        private void RootGrid_PointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            if (_criticalInitError)
+            {
+                // Exit when user clicks after a fatal init error
+                Close();
+            }
         }
 
         private async System.Threading.Tasks.Task RunInitializationSequenceAsync()
@@ -143,8 +162,10 @@ namespace GORE.UI
                 {
                     LogInit($"ERROR: Failed to load map - {ex.Message}");
                     LogInit("FATAL: Cannot start without valid map");
-                    await System.Threading.Tasks.Task.Delay(3000);
-                    Close();
+                    // Enter critical error state and wait for user to dismiss
+                    _criticalInitError = true;
+                    LogInit("");
+                    LogInit("Press any key or click to exit");
                     return;
                 }
 
@@ -174,8 +195,10 @@ namespace GORE.UI
                     }
                     LogInit("");
                     LogInit("FATAL: Cannot start with missing textures");
-                    await System.Threading.Tasks.Task.Delay(3000);
-                    Close();
+                    // Enter critical error state and wait for user to dismiss
+                    _criticalInitError = true;
+                    LogInit("");
+                    LogInit("Press any key or click to exit");
                     return;
                 }
 
@@ -229,10 +252,12 @@ namespace GORE.UI
                 LogInit("");
                 LogInit($"FATAL ERROR: {ex.Message}");
                 LogInit("");
-                LogInit("Press ESC or close window to exit");
+                LogInit("Press any key or click to exit");
                 System.Diagnostics.Debug.WriteLine($"Initialization failed: {ex}");
-                await System.Threading.Tasks.Task.Delay(5000);
-                Close();
+
+                // Enter critical error state and wait for user to dismiss
+                _criticalInitError = true;
+                return;
             }
         }
 
@@ -841,10 +866,11 @@ namespace GORE.UI
                             LogInit($"  {ex.Message}");
                             LogInit("");
                             LogInit("Cannot continue - missing required texture");
+                            LogInit("");
+                            LogInit("Press any key or click to exit");
+                            _criticalInitError = true;
                         });
 
-                        await System.Threading.Tasks.Task.Delay(3000);
-                        Close();
                         return;
                     }
                 }
@@ -870,10 +896,12 @@ namespace GORE.UI
                     LogInit("");
                     LogInit($"FATAL ERROR: Texture loading failed");
                     LogInit($"  {ex.Message}");
+                    LogInit("");
+                    LogInit("Press any key or click to exit");
+                    _criticalInitError = true;
                 });
 
-                await System.Threading.Tasks.Task.Delay(3000);
-                Close();
+                return;
             }
         }
 
@@ -1026,6 +1054,13 @@ namespace GORE.UI
 
         private void RootGrid_KeyDown(object sender, KeyRoutedEventArgs e)
         {
+            if (_criticalInitError)
+            {
+                // Any key press after a critical init error will exit
+                Close();
+                return;
+            }
+
             // Toggle console with ~ key (grave accent, key code 192)
             if ((int)e.Key == 192 || e.Key == (VirtualKey)192)
             {
@@ -1047,6 +1082,12 @@ namespace GORE.UI
 
         private void RootGrid_KeyUp(object sender, KeyRoutedEventArgs e)
         {
+            if (_criticalInitError)
+            {
+                Close();
+                e.Handled = true;
+                return;
+            }
             // Don't process game input if console is open
             if (_consoleVisible)
             {
@@ -1111,6 +1152,12 @@ namespace GORE.UI
 
         private void ConsoleInput_KeyDown(object sender, KeyRoutedEventArgs e)
         {
+            if (_criticalInitError)
+            {
+                Close();
+                e.Handled = true;
+                return;
+            }
             if (e.Key == VirtualKey.Enter)
             {
                 var input = ConsoleInput.Text;
