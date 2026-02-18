@@ -29,13 +29,16 @@ namespace GORE.Engine
         public int CurrentWeaponIndex => _currentWeaponIndex;
         public WeaponAnimationState AnimationState => _animationState;
 
-        public WeaponSystem()
+        private readonly GORE.Engine.Systems.ResourceLoader _resourceLoader;
+
+        public WeaponSystem(GORE.Engine.Systems.ResourceLoader resourceLoader)
         {
             _weapons = new List<Weapon>();
             _currentWeaponIndex = 0;
             _animationState = WeaponAnimationState.Idle;
             _animationTimer = 0f;
             _fireTimer = 0f;
+            _resourceLoader = resourceLoader;
         }
 
         /// <summary>
@@ -51,16 +54,18 @@ namespace GORE.Engine
                     configPath = Path.Combine(baseDirectory, "gt1", "weapons.json");
                 }
 
-                if (!File.Exists(configPath))
+                WeaponsConfig config = null;
+                try
+                {
+                    config = _resourceLoader.LoadJson<WeaponsConfig>(configPath);
+                }
+                catch (FileNotFoundException)
                 {
                     System.Diagnostics.Debug.WriteLine($"⚠ Weapons config not found: {configPath}");
                     System.Diagnostics.Debug.WriteLine("  Using default weapon configuration");
                     InitializeDefaultWeapons();
                     return;
                 }
-
-                var jsonText = File.ReadAllText(configPath);
-                var config = JsonSerializer.Deserialize<WeaponsConfig>(jsonText);
 
                 if (config?.Weapons == null || config.Weapons.Count == 0)
                 {
@@ -194,71 +199,50 @@ namespace GORE.Engine
                 {
                     System.Diagnostics.Debug.WriteLine($"\nWeapon {weapon.Id}: {weapon.Name}");
 
-                    // Load all 4 frames for each weapon
-                    var idlePath = Path.Combine(baseDirectory, weapon.IdlePath);
-                    var firePath = Path.Combine(baseDirectory, weapon.FirePath);
-                    var fireAltPath = Path.Combine(baseDirectory, weapon.FireAltPath);
-                    var reloadPath = Path.Combine(baseDirectory, weapon.ReloadPath);
-
-                    int loadedCount = 0;
-
-                    // Only load if files exist (allows for partial weapon sets during development)
-                    if (File.Exists(idlePath))
+                    // Load all 4 frames for each weapon using ResourceLoader
+                    if (!string.IsNullOrEmpty(weapon.IdlePath) && File.Exists(Path.Combine(baseDirectory, weapon.IdlePath)))
                     {
-                        weapon.IdleFrame = await CanvasBitmap.LoadAsync(device, idlePath);
+                        weapon.IdleFrame = await _resourceLoader.LoadTextureAsync(weapon.IdlePath, device);
                         System.Diagnostics.Debug.WriteLine($"  ✓ Loaded idle frame");
-                        loadedCount++;
                     }
                     else
                     {
                         System.Diagnostics.Debug.WriteLine($"  ✗ Missing: {weapon.IdlePath}");
                     }
 
-                    if (File.Exists(firePath))
+                    if (!string.IsNullOrEmpty(weapon.FirePath) && File.Exists(Path.Combine(baseDirectory, weapon.FirePath)))
                     {
-                        weapon.FireFrame = await CanvasBitmap.LoadAsync(device, firePath);
+                        weapon.FireFrame = await _resourceLoader.LoadTextureAsync(weapon.FirePath, device);
                         System.Diagnostics.Debug.WriteLine($"  ✓ Loaded fire frame");
-                        loadedCount++;
                     }
                     else
                     {
                         System.Diagnostics.Debug.WriteLine($"  ✗ Missing: {weapon.FirePath}");
                     }
 
-                    if (File.Exists(fireAltPath))
+                    if (!string.IsNullOrEmpty(weapon.FireAltPath) && File.Exists(Path.Combine(baseDirectory, weapon.FireAltPath)))
                     {
-                        weapon.FireAltFrame = await CanvasBitmap.LoadAsync(device, fireAltPath);
+                        weapon.FireAltFrame = await _resourceLoader.LoadTextureAsync(weapon.FireAltPath, device);
                         System.Diagnostics.Debug.WriteLine($"  ✓ Loaded fire_alt frame");
-                        loadedCount++;
                     }
                     else
                     {
                         System.Diagnostics.Debug.WriteLine($"  ✗ Missing: {weapon.FireAltPath}");
                     }
 
-                    if (File.Exists(reloadPath))
+                    if (!string.IsNullOrEmpty(weapon.ReloadPath) && File.Exists(Path.Combine(baseDirectory, weapon.ReloadPath)))
                     {
-                        weapon.ReloadFrame = await CanvasBitmap.LoadAsync(device, reloadPath);
+                        weapon.ReloadFrame = await _resourceLoader.LoadTextureAsync(weapon.ReloadPath, device);
                         System.Diagnostics.Debug.WriteLine($"  ✓ Loaded reload frame");
-                        loadedCount++;
                     }
                     else
                     {
                         System.Diagnostics.Debug.WriteLine($"  ✗ Missing: {weapon.ReloadPath}");
                     }
-
-                    if (loadedCount == 4)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"  ✓ Weapon {weapon.Id} ({weapon.Name}): All 4 frames loaded");
-                    }
-                    else
-                    {
-                        System.Diagnostics.Debug.WriteLine($"  ⚠ Weapon {weapon.Id} ({weapon.Name}): Only {loadedCount}/4 frames loaded");
-                    }
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"✗ Failed to load weapon {weapon.Id} ({weapon.Name}): {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"  ✗ Error loading weapon sprites: {ex.Message}");
                 }
             }
         }

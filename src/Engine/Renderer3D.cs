@@ -22,12 +22,14 @@ namespace GORE.Engine
         private CanvasRenderTarget _renderTarget;
         private readonly Dictionary<int, CanvasBitmap> _textures = new();
         private readonly Dictionary<int, TintEffect> _tintEffects = new();
+        private readonly GORE.Engine.Systems.ResourceLoader _resourceLoader;
 
-        public Renderer3D(int width, int height, RaycastEngine raycastEngine)
+        public Renderer3D(int width, int height, RaycastEngine raycastEngine, GORE.Engine.Systems.ResourceLoader resourceLoader)
         {
             _screenWidth = width;
             _screenHeight = height;
             _raycastEngine = raycastEngine;
+            _resourceLoader = resourceLoader;
         }
 
         // Initialize or recreate the render target. Accept explicit size so the render target
@@ -50,28 +52,15 @@ namespace GORE.Engine
 
         public async Task LoadTextureAsync(int textureId, string texturePath, CanvasDevice device)
         {
-            var baseDirectory = AppContext.BaseDirectory;
-            var fullPath = Path.Combine(baseDirectory, texturePath);
-
-            if (!File.Exists(fullPath))
-            {
-                throw new FileNotFoundException($"Texture file not found: {fullPath}");
-            }
-
             try
             {
-                var fileStream = File.OpenRead(fullPath);
-                var canvasBitmap = await CanvasBitmap.LoadAsync(device, fileStream.AsRandomAccessStream());
-
+                var canvasBitmap = await _resourceLoader.LoadTextureAsync(texturePath, device);
                 _textures[textureId] = canvasBitmap;
-
-                // Pre-create and cache the tint effect for this texture
                 _tintEffects[textureId] = new TintEffect
                 {
                     Source = canvasBitmap,
-                    Color = Color.FromArgb(255, 128, 128, 128) // 50% brightness for side walls
+                    Color = Color.FromArgb(255, 128, 128, 128)
                 };
-
                 System.Diagnostics.Debug.WriteLine($"✓ Loaded texture {textureId}: {texturePath} ({canvasBitmap.SizeInPixels.Width}x{canvasBitmap.SizeInPixels.Height})");
             }
             catch (FileNotFoundException)

@@ -21,11 +21,13 @@ namespace GORE.Engine
         public bool ConfigLoadedSuccessfully => _configLoadedSuccessfully;
         public string ConfigStatusMessage => _configStatusMessage;
 
-        public GameConfig(string configFileName = "config.json")
+        private readonly GORE.Engine.Systems.ResourceLoader _resourceLoader;
+
+        public GameConfig(string configFileName = "config.json", GORE.Engine.Systems.ResourceLoader resourceLoader = null)
         {
             var baseDirectory = AppContext.BaseDirectory;
             _configPath = ResolveConfigPath(baseDirectory, configFileName);
-
+            _resourceLoader = resourceLoader;
             RegisterDefaultVariables();
         }
 
@@ -130,33 +132,38 @@ namespace GORE.Engine
                     return;
                 }
 
-                var json = File.ReadAllText(_configPath);
-
-                // Try to parse JSON
-                Dictionary<string, JsonElement> configData;
-                try
+                Dictionary<string, JsonElement> configData = null;
+                if (_resourceLoader != null)
                 {
-                    configData = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json);
-                }
-                catch (JsonException ex)
-                {
-                    _configStatusMessage = $"Invalid config JSON - regenerating defaults (Error: {ex.Message})";
-                    _configLoadedSuccessfully = false;
-                    System.Diagnostics.Debug.WriteLine(_configStatusMessage);
-
-                    // Backup corrupt config
                     try
                     {
-                        var backupPath = _configPath + ".corrupt.bak";
-                        File.Copy(_configPath, backupPath, true);
-                        System.Diagnostics.Debug.WriteLine($"  Backed up corrupt config to {Path.GetFileName(backupPath)}");
+                        configData = _resourceLoader.LoadJson<Dictionary<string, JsonElement>>(_configPath);
                     }
-                    catch { /* Ignore backup errors */ }
+                    catch (Exception ex)
+                    {
+                        _configStatusMessage = $"Invalid config JSON - regenerating defaults (Error: {ex.Message})";
+                        _configLoadedSuccessfully = false;
+                        System.Diagnostics.Debug.WriteLine(_configStatusMessage);
 
-                    SaveConfig(); // Regenerate defaults
-                    _configLoadedSuccessfully = true;
-                    _configStatusMessage = "Config regenerated from defaults";
-                    return;
+                        // Backup corrupt config
+                        try
+                        {
+                            var backupPath = _configPath + ".corrupt.bak";
+                            File.Copy(_configPath, backupPath, true);
+                            System.Diagnostics.Debug.WriteLine($"  Backed up corrupt config to {Path.GetFileName(backupPath)}");
+                        }
+                        catch { /* Ignore backup errors */ }
+
+                        SaveConfig(); // Regenerate defaults
+                        _configLoadedSuccessfully = true;
+                        _configStatusMessage = "Config regenerated from defaults";
+                        return;
+                    }
+                }
+                else
+                {
+                    var json = File.ReadAllText(_configPath);
+                    configData = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json);
                 }
 
                 if (configData == null || configData.Count == 0)

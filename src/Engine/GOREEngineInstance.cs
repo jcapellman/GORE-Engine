@@ -21,66 +21,44 @@ namespace GORE.Engine
         public bool CriticalInitError { get; private set; }
         public string InitLog { get; private set; } = string.Empty;
 
-        public async Task<bool> InitializeAsync(Action<string> log, Action<string> logError)
+        // Dependency Injection constructor
+        public GOREEngineInstance(
+            ConfigSystem configSystem,
+            MapSystem mapSystem,
+            WeaponSystem weaponSystem,
+            RendererSystem rendererSystem,
+            Action<string> log = null,
+            Action<string> logError = null)
         {
-            try
-            {
-                // Config
-                ConfigSystem = new ConfigSystem();
-                ConfigSystem.Load();
-                ConfigSystem.ValidateAndClamp();
+            ConfigSystem = configSystem;
+            MapSystem = mapSystem;
+            WeaponSystem = weaponSystem;
+            RendererSystem = rendererSystem;
 
-                // Event system
-                EventSystem = new EventSystem();
+            // Event system
+            EventSystem = new EventSystem();
 
-                // HUD
-                HudSystem = new HudSystem();
+            // HUD
+            HudSystem = new HudSystem();
 
-                // Input
-                InputSystem = new InputSystem();
+            // Input
+            InputSystem = new InputSystem();
 
-                // Map
-                MapSystem = new MapSystem();
-                var mapData = await MapSystem.LoadInitialMapAsync("e1m1");
+            // Audio
+            SoundEffectSystem = new SoundEffectSystem();
+            MusicSystem = new MusicSystem();
 
-                // Raycast
-                RaycastEngine = new RaycastEngine(mapData.Grid, EventSystem);
-                RaycastEngine.PlayerPosition = mapData.PlayerStart;
+            // Console
+            GameConsole = new GameConsole();
+            GameConsole.SetConfig(ConfigSystem.GetConfig());
 
-                // Renderer
-                RendererSystem = new RendererSystem();
-                RendererSystem.Initialize(ConfigSystem.RenderWidth, ConfigSystem.RenderHeight, RaycastEngine);
+            // Wire input to weapons
+            InputSystem.NextWeaponRequested = () => WeaponSystem?.NextWeapon();
+            InputSystem.PreviousWeaponRequested = () => WeaponSystem?.PreviousWeapon();
+            InputSystem.WeaponNumberKeyPressed += idx => WeaponSystem?.SwitchToWeapon(idx);
 
-                // Weapons
-                WeaponSystem = new WeaponSystem();
-                WeaponSystem.LoadWeaponsConfig();
-
-                // Audio
-                SoundEffectSystem = new SoundEffectSystem();
-                MusicSystem = new MusicSystem();
-
-                // Console
-                GameConsole = new GameConsole();
-                GameConsole.SetConfig(ConfigSystem.GetConfig());
-
-                // Wire input to weapons
-                InputSystem.NextWeaponRequested = () => WeaponSystem?.NextWeapon();
-                InputSystem.PreviousWeaponRequested = () => WeaponSystem?.PreviousWeapon();
-                InputSystem.WeaponNumberKeyPressed += idx => WeaponSystem?.SwitchToWeapon(idx);
-
-                // Wire door event to sound
-                EventSystem.Subscribe<DoorInteractedEvent>(_ => SoundEffectSystem?.Play("door"));
-
-                // (Font/icon/texture loading can be added here as needed)
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                logError?.Invoke($"Initialization failed: {ex.Message}");
-                CriticalInitError = true;
-                return false;
-            }
+            // Wire door event to sound
+            EventSystem.Subscribe<DoorInteractedEvent>(_ => SoundEffectSystem?.Play("door"));
         }
     }
 }

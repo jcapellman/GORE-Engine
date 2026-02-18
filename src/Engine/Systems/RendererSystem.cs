@@ -12,13 +12,17 @@ namespace GORE.Engine
     {
         private Renderer3D _renderer;
         private RaycastEngine _raycastEngine;
+        private readonly GORE.Engine.Systems.ResourceLoader _resourceLoader;
 
-        public RendererSystem() { }
+        public RendererSystem(GORE.Engine.Systems.ResourceLoader resourceLoader)
+        {
+            _resourceLoader = resourceLoader;
+        }
 
         public void Initialize(int width, int height, RaycastEngine raycastEngine)
         {
             _raycastEngine = raycastEngine;
-            _renderer = new Renderer3D(width, height, raycastEngine);
+            _renderer = new Renderer3D(width, height, raycastEngine, _resourceLoader);
         }
 
         public void InitializeResources(CanvasDevice device, int canvasWidth, int canvasHeight)

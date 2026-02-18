@@ -7,7 +7,13 @@ namespace GORE.Engine.Systems
 {
     public class MapSystem
     {
+        private readonly ResourceLoader _resourceLoader;
         public MapData CurrentMap { get; private set; }
+
+        public MapSystem(ResourceLoader resourceLoader)
+        {
+            _resourceLoader = resourceLoader;
+        }
 
         public async Task<MapData> LoadInitialMapAsync(string mapName)
         {

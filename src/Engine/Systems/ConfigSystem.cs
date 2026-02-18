@@ -5,10 +5,16 @@ namespace GORE.Engine
     public class ConfigSystem
     {
         private GameConfig _config;
+        private readonly GORE.Engine.Systems.ResourceLoader _resourceLoader;
+
+        public ConfigSystem(GORE.Engine.Systems.ResourceLoader resourceLoader)
+        {
+            _resourceLoader = resourceLoader;
+        }
 
         public void Load()
         {
-            _config = new GameConfig();
+            _config = new GameConfig("config.json", _resourceLoader);
             _config.LoadConfig();
         }
 

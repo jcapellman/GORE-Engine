@@ -1,4 +1,5 @@
 using GORE.Engine;
+using GORE.Engine.Systems;
 using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.Graphics.Canvas;
 using Microsoft.UI.Xaml;
@@ -17,13 +18,25 @@ namespace GORE.UI
 {
     public sealed partial class GameWindow : Window
     {
+        // Engine systems
         private GOREEngineInstance _engine;
+        private ResourceLoader _resourceLoader;
+        private ConfigSystem _configSystem;
+        private MapSystem _mapSystem;
+        private WeaponSystem _weaponSystem;
+        private RendererSystem _rendererSystem;
+
+        // State fields
         private bool _isGameLoopRunning;
         private bool _consoleVisible;
         private bool _criticalInitError;
         private System.Text.StringBuilder _initLog;
         private float _lastDeltaTime = 0.016f;
         private const float MAX_DELTA_TIME = 0.05f;
+        private const int TILDE_KEY_CODE = 192;
+        private const double CONSOLE_ANIMATION_FROM = -400;
+        private const double CONSOLE_ANIMATION_TO = 0;
+        private const int CONSOLE_ANIMATION_DURATION_MS = 200;
         private float _mouseSensitivity = 0.002f;
         private Vector2 _cachedRightVector;
         private Microsoft.UI.Dispatching.DispatcherQueueHandler _updateHudAction;
@@ -39,12 +52,18 @@ namespace GORE.UI
         {
             InitializeComponent();
             _initLog = new System.Text.StringBuilder();
+            _resourceLoader = new ResourceLoader();
 
-            
+            // Dependency injection: create all systems with the same ResourceLoader
+            _configSystem = new ConfigSystem(_resourceLoader);
+            _mapSystem = new MapSystem(_resourceLoader);
+            _weaponSystem = new WeaponSystem(_resourceLoader);
+            // RendererSystem will be constructed later when we have width/height/raycastEngine
+            _rendererSystem = null;
 
             _updateHudAction = () =>
             {
-                if (_engine != null && _engine.HudSystem != null)
+                if (_engine?.HudSystem != null)
                 {
                     HealthText.Text = _engine.HudSystem.HealthText;
                     AmmoText.Text = _engine.HudSystem.AmmoText;
@@ -57,6 +76,7 @@ namespace GORE.UI
             };
 
             RootGrid.PointerPressed += RootGrid_PointerPressed;
+            this.Closed += GameWindow_Closed;
 
             // Start engine initialization
             _ = InitializeEngineAsync();
@@ -82,7 +102,27 @@ namespace GORE.UI
             void log(string msg) { _initLog.AppendLine(msg); LogInit(msg); }
             void logError(string msg) { _initLog.AppendLine(msg); LogInit(msg); }
 
-            _engine = await GOREEngine.CreateAndInitializeAsync(log, logError);
+            // Initialize config, map, weapon systems (already constructed with DI)
+            _configSystem.Load();
+            _weaponSystem.LoadWeaponsConfig();
+
+
+            // Create a dummy RaycastEngine for now (replace with real one after map load)
+            var dummyRaycast = new RaycastEngine(new int[1, 1], null);
+            // RendererSystem needs ResourceLoader
+            _rendererSystem = new RendererSystem(_resourceLoader);
+            _rendererSystem.Initialize(640, 480, dummyRaycast);
+
+            // Create engine instance with DI systems
+            _engine = new GOREEngineInstance(
+                _configSystem,
+                _mapSystem,
+                _weaponSystem,
+                _rendererSystem,
+                log,
+                logError
+            );
+
             if (_engine == null || _engine.CriticalInitError)
             {
                 _criticalInitError = true;
@@ -101,7 +141,7 @@ namespace GORE.UI
                 try
                 {
                     _engine.RendererSystem?.Dispose();
-                    _engine.RendererSystem = new RendererSystem();
+                    _engine.RendererSystem = new RendererSystem(_resourceLoader);
                     _engine.RendererSystem.Initialize(w, h, _engine.RaycastEngine);
                     if (ViewportCanvas?.Device != null)
                     {
@@ -127,6 +167,19 @@ namespace GORE.UI
             LogInit("Type 'help' for available commands");
             LogInit("");
 
+            // Load default map 'e1m1' after initialization
+            await LoadMapAsync("e1m1");
+
+            // Load HUD icons and custom font
+            await LoadHudIconsAsync();
+            await LoadCustomFontAsync();
+
+            // Ensure weapon sprites are loaded if device is available
+            if (ViewportCanvas?.Device != null)
+            {
+                await _engine.WeaponSystem.LoadWeaponSpritesAsync(ViewportCanvas.Device);
+            }
+
             await System.Threading.Tasks.Task.Delay(2000);
             InitScreen.Visibility = Visibility.Collapsed;
         }
@@ -134,212 +187,35 @@ namespace GORE.UI
         private void LogInit(string message)
         {
             _initLog.AppendLine(message);
-
-            // Update UI on UI thread
-            DispatcherQueue.TryEnqueue(() =>
-            {
-                InitMessages.Text = _initLog.ToString();
-            });
-
-            // Also add to console if it's initialized
-            if (_engine != null && _engine.GameConsole != null)
-            {
-                _engine.GameConsole.AddToHistory(message);
-            }
-
-            System.Diagnostics.Debug.WriteLine(message);
+            EnqueueOnUIThread(() => InitMessages.Text = _initLog.ToString());
+            _engine?.GameConsole?.AddToHistory(message);
+            Debug.WriteLine(message);
         }
 
-        private void CheckDirectory(string path)
+        private void EnqueueOnUIThread(Action action)
         {
-            if (Directory.Exists(path))
-            {
-                LogInit($"  {path} - OK");
-            }
-            else
-            {
-                LogInit($"  {path} - NOT FOUND");
-            }
+            DispatcherQueue.TryEnqueue(new Microsoft.UI.Dispatching.DispatcherQueueHandler(action));
         }
 
-        private void RegisterConsoleCommands()
-        {
-            var console = _engine.GameConsole;
-            // Register game-specific console commands
-            console.RegisterGameCommands(_engine.RaycastEngine,
-                health => _health = health,
-                ammo => _ammo = ammo);
+        private void CheckDirectory(string path) => LogInit(Directory.Exists(path)
+            ? $"  {path} - OK"
+            : $"  {path} - NOT FOUND");
 
-            // Register map loading command
-            console.RegisterCommand("map", "Load a map (usage: map <mapname>)", async args =>
-            {
-                if (args.Length == 0)
-                {
-                    console.AddToHistory("Usage: map <mapname>");
-                    console.AddToHistory("Example: map e1m1");
-                    return;
-                }
 
-                var mapName = args[0];
-                await LoadMapAsync(mapName);
-            });
-
-            // Register map listing command
-            console.RegisterCommand("maps", "List available maps", args =>
-            {
-                try
-                {
-                    var baseDirectory = AppContext.BaseDirectory;
-                    var mapsDirectory = System.IO.Path.Combine(baseDirectory, "gt1", "maps");
-
-                    if (!Directory.Exists(mapsDirectory))
-                    {
-                        console.AddToHistory("Maps directory not found");
-                        return;
-                    }
-
-                    var mapFiles = Directory.GetFiles(mapsDirectory, "*.map");
-
-                    if (mapFiles.Length == 0)
-                    {
-                        console.AddToHistory("No maps found");
-                        return;
-                    }
-
-                    console.AddToHistory("Available maps:");
-                    foreach (var mapFile in mapFiles.OrderBy(f => f))
-                    {
-                        var mapName = Path.GetFileNameWithoutExtension(mapFile);
-                        console.AddToHistory($"  {mapName}");
-                    }
-                    console.AddToHistory($"Total: {mapFiles.Length} map(s)");
-                }
-                catch (Exception ex)
-                {
-                    console.AddToHistory($"Error listing maps: {ex.Message}");
-                }
-            });
-
-            // Register weapon commands
-            console.RegisterCommand("weapon", "Switch weapon (usage: weapon <0-7>)", args =>
-            {
-                var ws = _engine.WeaponSystem;
-                if (args.Length == 0)
-                {
-                    var current = ws.CurrentWeapon;
-                    console.AddToHistory($"Current weapon: [{ws.CurrentWeaponIndex}] {current.Name}");
-                    if (current.InfiniteAmmo)
-                    {
-                        console.AddToHistory($"  Ammo: Infinite");
-                    }
-                    else if (current.MagazineSize > 0)
-                    {
-                        console.AddToHistory($"  Magazine: {current.MagazineAmmo}/{current.MagazineSize}");
-                        console.AddToHistory($"  Reserve: {current.CurrentAmmo}/{current.MaxAmmo}");
-                    }
-                    else
-                    {
-                        console.AddToHistory($"  Ammo: {current.CurrentAmmo}/{current.MaxAmmo}");
-                    }
-                    console.AddToHistory($"  Damage: {current.DamagePerRound}");
-                    console.AddToHistory($"  Fire rate: {current.FireRate:F2}s");
-                    console.AddToHistory($"  Ammo type: {current.AmmoType}");
-                    console.AddToHistory("Usage: weapon <0-7>");
-                    return;
-                }
-
-                if (int.TryParse(args[0], out int weaponIndex))
-                {
-                    if (ws.SwitchToWeapon(weaponIndex))
-                    {
-                        var weapon = ws.CurrentWeapon;
-                        console.AddToHistory($"Switched to: [{weaponIndex}] {weapon.Name}");
-                    }
-                    else
-                    {
-                        console.AddToHistory($"Invalid weapon index: {weaponIndex} (valid: 0-7)");
-                    }
-                }
-                else
-                {
-                    console.AddToHistory($"Invalid number: {args[0]}");
-                }
-            });
-
-            console.RegisterCommand("weapons", "List all weapons", args =>
-            {
-                var ws = _engine.WeaponSystem;
-                console.AddToHistory("Available weapons:");
-                for (int i = 0; i < 8; i++)
-                {
-                    var weapon = ws.GetWeapon(i);
-                    if (weapon == null) continue;
-
-                    var marker = (i == ws.CurrentWeaponIndex) ? ">" : " ";
-
-                    string ammoStr;
-                    if (weapon.InfiniteAmmo)
-                    {
-                        ammoStr = "∞";
-                    }
-                    else if (weapon.MagazineSize > 0)
-                    {
-                        ammoStr = $"{weapon.MagazineAmmo}/{weapon.MagazineSize} ({weapon.CurrentAmmo})";
-                    }
-                    else
-                    {
-                        ammoStr = $"{weapon.CurrentAmmo}/{weapon.MaxAmmo}";
-                    }
-
-                    console.AddToHistory($"{marker} [{i}] {weapon.Name} - {ammoStr} - {weapon.DamagePerRound}dmg - {weapon.FireRate:F2}s");
-                }
-            });
-
-            console.RegisterCommand("giveammo", "Give ammo to weapon (usage: giveammo <weapon> <amount>)", args =>
-            {
-                var ws = _engine.WeaponSystem;
-                if (args.Length < 2)
-                {
-                    console.AddToHistory("Usage: giveammo <weapon> <amount>");
-                    console.AddToHistory("Example: giveammo 1 50");
-                    return;
-                }
-
-                if (int.TryParse(args[0], out int weaponIndex) && int.TryParse(args[1], out int amount))
-                {
-                    var weapon = ws.GetWeapon(weaponIndex);
-                    if (weapon != null)
-                    {
-                        weapon.AddAmmo(amount);
-                        console.AddToHistory($"Added {amount} ammo to {weapon.Name}");
-                        console.AddToHistory($"  Ammo: {weapon.CurrentAmmo}/{weapon.MaxAmmo}");
-                    }
-                    else
-                    {
-                        console.AddToHistory($"Invalid weapon: {weaponIndex}");
-                    }
-                }
-                else
-                {
-                    console.AddToHistory("Invalid arguments");
-                }
-            });
-        }
 
         // Config handled by ConfigSystem; helpers removed
+
 
         /// <summary>
         /// Safely get a config value with fallback default
         /// </summary>
         private T GetConfigValue<T>(string name, T defaultValue)
         {
-            // ConfigSystem is guaranteed to be non-null after initialization
             return _engine.ConfigSystem.GetValue(name, defaultValue);
         }
 
         private void UpdateCachedConfigValues()
         {
-            // ConfigSystem is guaranteed to be non-null after initialization
             _engine.HudSystem.SetShowFps(_engine.ConfigSystem.ShowFps);
             _mouseSensitivity = _engine.ConfigSystem.MouseSensitivity;
         }
@@ -361,7 +237,6 @@ namespace GORE.UI
             var console = _engine.GameConsole;
             console.SetConfig(_engine.ConfigSystem.GetConfig());
             console.OnHistoryChanged += UpdateConsoleDisplay;
-            console.OnHistoryChanged += UpdateConsoleDisplay;
         }
 
         private async System.Threading.Tasks.Task LoadCustomFontAsync()
@@ -370,20 +245,23 @@ namespace GORE.UI
             {
                 var baseDirectory = AppContext.BaseDirectory;
                 var fontPath = Path.Combine(baseDirectory, "gt1", "font.ttf");
+                var fontFamilyName = "GT1";
 
-                if (File.Exists(fontPath))
+                FontFamily fontFamily = null;
+                try
                 {
-                    var fontFamily = new FontFamily($"ms-appx:///gt1/font.ttf#GT1");
-
-                    // Apply to HUD text elements
-                    HealthText.FontFamily = fontFamily;
-                    AmmoText.FontFamily = fontFamily;
-
-                    LogInit($"  Custom font loaded from: {fontPath}");
+                    fontFamily = _resourceLoader.LoadFont(Path.Combine("gt1", "font.ttf"), fontFamilyName);
                 }
-                else
+                catch (FileNotFoundException)
                 {
                     LogInit($"  Font not found: {fontPath} - using default");
+                }
+
+                if (fontFamily != null)
+                {
+                    HealthText.FontFamily = fontFamily;
+                    AmmoText.FontFamily = fontFamily;
+                    LogInit($"  Custom font loaded from: {fontPath}");
                 }
             }
             catch (Exception ex)
@@ -404,31 +282,8 @@ namespace GORE.UI
 
                 var missingIcons = new List<string>();
 
-                // Check health icon
-                if (File.Exists(healthIconPath))
-                {
-                    var healthUri = new Uri($"file:///{healthIconPath.Replace("\\", "/")}");
-                    var healthBitmap = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(healthUri);
-                    HealthIcon.Source = healthBitmap;
-                    LogInit($"  Health icon loaded: gt1/hud/health.png");
-                }
-                else
-                {
-                    missingIcons.Add("  gt1/hud/health.png");
-                }
-
-                // Check ammo icon
-                if (File.Exists(ammoIconPath))
-                {
-                    var ammoUri = new Uri($"file:///{ammoIconPath.Replace("\\", "/")}");
-                    var ammoBitmap = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(ammoUri);
-                    AmmoIcon.Source = ammoBitmap;
-                    LogInit($"  Ammo icon loaded: gt1/hud/ammo.png");
-                }
-                else
-                {
-                    missingIcons.Add("  gt1/hud/ammo.png");
-                }
+                LoadHudIconAsync(healthIconPath, HealthIcon, "gt1/hud/health.png", missingIcons);
+                LoadHudIconAsync(ammoIconPath, AmmoIcon, "gt1/hud/ammo.png", missingIcons);
 
                 if (missingIcons.Count > 0)
                 {
@@ -448,6 +303,28 @@ namespace GORE.UI
             }
 
             await System.Threading.Tasks.Task.CompletedTask;
+        }
+
+        private void LoadHudIconAsync(string iconPath, Microsoft.UI.Xaml.Controls.Image iconControl, string logName, List<string> missingIcons)
+        {
+            if (File.Exists(iconPath))
+            {
+                try
+                {
+                    var uri = new Uri($"file:///{iconPath.Replace("\\", "/")}");
+                    var bitmap = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(uri);
+                    iconControl.Source = bitmap;
+                    LogInit($"  {logName} loaded");
+                }
+                catch (Exception ex)
+                {
+                    missingIcons.Add($"  {logName} (error: {ex.Message})");
+                }
+            }
+            else
+            {
+                missingIcons.Add($"  {logName}");
+            }
         }
 
         private async System.Threading.Tasks.Task LoadMapAsync(string mapName)
@@ -504,7 +381,7 @@ namespace GORE.UI
                 // Update renderer system with resolution from config
                 int renderWidth = _engine.ConfigSystem.RenderWidth;
                 int renderHeight = _engine.ConfigSystem.RenderHeight;
-                _engine.RendererSystem = new RendererSystem();
+                _engine.RendererSystem = new RendererSystem(_resourceLoader);
                 _engine.RendererSystem.Initialize(renderWidth, renderHeight, _engine.RaycastEngine);
 
                 // Reset initialization flags
@@ -789,10 +666,7 @@ namespace GORE.UI
             }
         }
 
-        private void UpdatePlayerMovement(float deltaTime)
-        {
-            // Now handled inline in the update loop via InputSystem
-        }
+
 
 
         private void RootGrid_KeyDown(object sender, KeyRoutedEventArgs e)
@@ -804,8 +678,8 @@ namespace GORE.UI
                 return;
             }
 
-            // Toggle console with ~ key (grave accent, key code 192)
-            if ((int)e.Key == 192 || e.Key == (VirtualKey)192)
+            // Toggle console with ~ key
+            if ((int)e.Key == TILDE_KEY_CODE || e.Key == (VirtualKey)TILDE_KEY_CODE)
             {
                 ToggleConsole();
                 e.Handled = true;
@@ -821,6 +695,7 @@ namespace GORE.UI
 
             // Delegate to input system
             _engine.InputSystem.HandleKey(e.Key, true);
+            HandleKeyInput(e.Key, true);
             e.Handled = true;
         }
 
@@ -841,6 +716,7 @@ namespace GORE.UI
 
             // Delegate to input system
             _engine.InputSystem.HandleKey(e.Key, false);
+            HandleKeyInput(e.Key, false);
             e.Handled = true;
         }
 
@@ -850,13 +726,12 @@ namespace GORE.UI
 
             if (_consoleVisible)
             {
-                // Show console with slide-down animation
                 ConsoleOverlay.Visibility = Visibility.Visible;
                 var animation = new DoubleAnimation
                 {
-                    From = -400,
-                    To = 0,
-                    Duration = TimeSpan.FromMilliseconds(200),
+                    From = CONSOLE_ANIMATION_FROM,
+                    To = CONSOLE_ANIMATION_TO,
+                    Duration = TimeSpan.FromMilliseconds(CONSOLE_ANIMATION_DURATION_MS),
                     EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
                 };
 
@@ -866,17 +741,15 @@ namespace GORE.UI
                 Storyboard.SetTargetProperty(animation, "Y");
                 storyboard.Begin();
 
-                // Focus the input box
                 ConsoleInput.Focus(FocusState.Programmatic);
             }
             else
             {
-                // Hide console with slide-up animation
                 var animation = new DoubleAnimation
                 {
-                    From = 0,
-                    To = -400,
-                    Duration = TimeSpan.FromMilliseconds(200),
+                    From = CONSOLE_ANIMATION_TO,
+                    To = CONSOLE_ANIMATION_FROM,
+                    Duration = TimeSpan.FromMilliseconds(CONSOLE_ANIMATION_DURATION_MS),
                     EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseIn }
                 };
 
@@ -890,7 +763,6 @@ namespace GORE.UI
                 };
                 storyboard.Begin();
 
-                // Return focus to game
                 RootGrid.Focus(FocusState.Programmatic);
             }
         }
@@ -923,7 +795,7 @@ namespace GORE.UI
                 ConsoleInput.SelectionStart = ConsoleInput.Text.Length;
                 e.Handled = true;
             }
-            else if ((int)e.Key == 192 || e.Key == (VirtualKey)192) // ~ key
+            else if ((int)e.Key == TILDE_KEY_CODE || e.Key == (VirtualKey)TILDE_KEY_CODE) // ~ key
             {
                 ToggleConsole();
                 e.Handled = true;
@@ -982,14 +854,10 @@ namespace GORE.UI
 
         private void UpdateConsoleDisplay()
         {
-            // Skip update if console is not visible (performance optimization)
             if (!_consoleVisible && ConsoleOverlay.Visibility != Visibility.Visible)
-            {
                 return;
-            }
 
-            // Use StringBuilder to reduce string allocations
-            var history = _engine.GameConsole.History;
+            var history = _engine?.GameConsole?.History ?? new List<string>();
             if (history.Count == 0)
             {
                 ConsoleHistoryText.Text = string.Empty;
@@ -1000,8 +868,8 @@ namespace GORE.UI
             }
             else
             {
-                var sb = new System.Text.StringBuilder(history.Count * 50); // Estimate capacity
-                for (int i = 0; i < history.Count; i++)
+                var sb = new System.Text.StringBuilder(history.Count * 50);
+                for (var i = 0; i < history.Count; i++)
                 {
                     if (i > 0) sb.Append('\n');
                     sb.Append(history[i]);
@@ -1009,9 +877,15 @@ namespace GORE.UI
                 ConsoleHistoryText.Text = sb.ToString();
             }
 
-            // Auto-scroll to bottom
             ConsoleScrollViewer.UpdateLayout();
             ConsoleScrollViewer.ChangeView(null, ConsoleScrollViewer.ScrollableHeight, null);
+        }
+
+        // Unsubscribe events on close to avoid memory leaks
+        private void GameWindow_Closed(object sender, WindowEventArgs args)
+        {
+            if (_engine?.GameConsole != null)
+                _engine.GameConsole.OnHistoryChanged -= UpdateConsoleDisplay;
         }
     }
 }
