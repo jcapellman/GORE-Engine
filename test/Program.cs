@@ -39,9 +39,10 @@ namespace GORETest
 
             // OpenGL window using Silk.NET.Windowing
             var options = WindowOptions.Default;
-            options.Size = new Silk.NET.Maths.Vector2D<int>(640, 480);
+            options.Size = new Silk.NET.Maths.Vector2D<int>(1920, 1200);
             options.Title = "GORE Engine";
             options.API = GraphicsAPI.Default;
+            options.WindowState = WindowState.Fullscreen;
 
             IWindow window = Window.Create(options);
             GL gl = null;
@@ -51,6 +52,16 @@ namespace GORETest
             {
                 gl = GL.GetApi(window);
                 input = window.CreateInput();
+                // Escape key handler to close window
+                if (input != null && input.Keyboards.Count > 0)
+                {
+                    var keyboard = input.Keyboards[0];
+                    keyboard.KeyDown += (kb, key, modifiers) =>
+                    {
+                        if (key == Silk.NET.Input.Key.Escape)
+                            window.Close();
+                    };
+                }
                 // Get the actual OpenGLRenderer instance from RendererSystem
                 var oglRendererField = engine.RendererSystem.GetType().GetField("_renderer", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
                 var oglRenderer = oglRendererField?.GetValue(engine.RendererSystem) as GORE.Engine.Renderers.OpenGLRenderer;

@@ -244,8 +244,8 @@ namespace GORE.Engine.Renderers
                         _gl.DrawElements(PrimitiveType.Triangles, 6, DrawElementsType.UnsignedInt, null);
                         _gl.BindVertexArray(0);
                         // Ceiling (offset slightly up to avoid z-fighting)
-                        if (colorLoc != -1) _gl.Uniform4(colorLoc, 0.15f, 0.15f, 0.15f, 1.0f); // dark gray
-                        model = Matrix4x4.CreateTranslation(wx, wallSize + 0.01f, wz);
+                        if (colorLoc != -1) _gl.Uniform4(colorLoc, 0.4f, 0.4f, 0.4f, 1.0f); // lighter gray for visibility
+                        model = Matrix4x4.CreateTranslation(wx, wallSize, wz);
                         if (modelLoc != -1)
                         {
                             unsafe { _gl.UniformMatrix4(modelLoc, 1, false, (float*)&model); }
@@ -281,12 +281,18 @@ namespace GORE.Engine.Renderers
                 };
                 // West face (toward -X)
                 faceVertices[2] = new float[] {
-                    0f, 0f, wallSize, 0f, 0f,
-                    0f, 0f, 0f, 1f, 0f,
-                    0f, wallSize, 0f, 1f, 1f,
-                    0f, wallSize, wallSize, 0f, 1f
+                    0f, 0f, 0f, 0f, 0f,
+                    0f, 0f, wallSize, 1f, 0f,
+                    0f, wallSize, wallSize, 1f, 1f,
+                    0f, wallSize, 0f, 0f, 1f
                 };
                 // East face (toward +X)
+                faceVertices[3] = new float[] {
+                    wallSize, 0f, 0f, 0f, 0f,
+                    wallSize, 0f, wallSize, 1f, 0f,
+                    wallSize, wallSize, wallSize, 1f, 1f,
+                    wallSize, wallSize, 0f, 0f, 1f
+                };
                 int[] dx = { 0, 0, -1, 1 };
                 int[] dy = { -1, 1, 0, 0 };
                 for (int y = 0; y < mapH; y++)
