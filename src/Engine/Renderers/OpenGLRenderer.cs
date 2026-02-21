@@ -115,12 +115,16 @@ namespace GORE.Engine.Renderers
         private Vector3 _cameraPos = new Vector3(1.5f, 6.0f, 1.5f); // Player is 6 units tall, wall is 8 units
         private float _yaw = 0f;   // radians
         private float _pitch = 0f; // radians
-        private float _moveSpeed = 5.0f; // units/sec
+        private float _moveSpeed = 20.0f; // Wolf3D-fast movement speed
         private float _rotSpeed = 1.5f; // radians/sec
 
 
         public unsafe void Render(object drawingSession, float width, float height, float dt = 1f/60f)
         {
+            // Ensure correct OpenGL state for opaque geometry
+            _gl.Enable(Silk.NET.OpenGL.EnableCap.DepthTest);
+            _gl.DepthMask(true);
+            _gl.Disable(Silk.NET.OpenGL.EnableCap.Blend);
             if (_gl == null) Console.WriteLine("GL context is null");
             if (!_initialized) Console.WriteLine("Renderer not initialized");
             if (CurrentMap == null) Console.WriteLine("CurrentMap is null");
@@ -135,7 +139,7 @@ namespace GORE.Engine.Renderers
             if (_keyboard != null)
             {
                 Vector3 forward = new Vector3((float)Math.Sin(_yaw), 0, (float)Math.Cos(_yaw));
-                Vector3 right = new Vector3(forward.Z, 0, -forward.X);
+                Vector3 right = new Vector3(-forward.Z, 0, forward.X);
                 Vector3 move = Vector3.Zero;
                 if (_keyboard.IsKeyPressed(Silk.NET.Input.Key.W))
                     move += forward;
@@ -205,9 +209,9 @@ namespace GORE.Engine.Renderers
                         float wx = x * wallSize;
                         float wy = 0.0f;
                         float wz = y * wallSize;
-                        // Floor
+                        // Floor (offset slightly down to avoid z-fighting)
                         if (colorLoc != -1) _gl.Uniform4(colorLoc, 0.3f, 0.3f, 0.3f, 1.0f); // medium gray
-                        var model = Matrix4x4.CreateTranslation(wx, wy, wz);
+                        var model = Matrix4x4.CreateTranslation(wx, -0.01f, wz);
                         if (modelLoc != -1)
                         {
                             unsafe { _gl.UniformMatrix4(modelLoc, 1, false, (float*)&model); }
@@ -223,9 +227,9 @@ namespace GORE.Engine.Renderers
                         }
                         _gl.DrawElements(PrimitiveType.Triangles, 6, DrawElementsType.UnsignedInt, null);
                         _gl.BindVertexArray(0);
-                        // Ceiling
+                        // Ceiling (offset slightly up to avoid z-fighting)
                         if (colorLoc != -1) _gl.Uniform4(colorLoc, 0.15f, 0.15f, 0.15f, 1.0f); // dark gray
-                        model = Matrix4x4.CreateTranslation(wx, wallSize, wz);
+                        model = Matrix4x4.CreateTranslation(wx, wallSize + 0.01f, wz);
                         if (modelLoc != -1)
                         {
                             unsafe { _gl.UniformMatrix4(modelLoc, 1, false, (float*)&model); }
@@ -286,7 +290,7 @@ namespace GORE.Engine.Renderers
                         if (texId != 0)
                         {
                             _gl.BindTexture(TextureTarget.Texture2D, texId);
-                            if (colorLoc != -1) _gl.Uniform4(colorLoc, 0f, 0f, 0f, 0f);
+                            if (colorLoc != -1) _gl.Uniform4(colorLoc, 0f, 0f, 0f, -1f);
                         }
                         else
                         {
