@@ -174,7 +174,7 @@ namespace GORE.Engine.Renderers
                 // Perspective projection
                 float aspect = width / height;
                 float fovY = MathF.PI / 3f; // 60 deg
-                float near = 0.01f, far = 100f; // Lower near plane to avoid clipping bottom of cubes
+                float near = 0.01f, far = 1000f; // Increased far plane for distant rendering
                 var proj = Matrix4x4.CreatePerspectiveFieldOfView(fovY, aspect, near, far);
                 // Camera view
                 Vector3 camTarget = _cameraPos + GetCameraForward();
@@ -271,12 +271,6 @@ namespace GORE.Engine.Renderers
                     0f, wallSize, wallSize, 0f, 1f
                 };
                 // East face (toward +X)
-                faceVertices[3] = new float[] {
-                    wallSize, 0f, wallSize, 0f, 0f,
-                    wallSize, 0f, 0f, 1f, 0f,
-                    wallSize, wallSize, 0f, 1f, 1f,
-                    wallSize, wallSize, wallSize, 0f, 1f
-                };
                 int[] dx = { 0, 0, -1, 1 };
                 int[] dy = { -1, 1, 0, 0 };
                 for (int y = 0; y < mapH; y++)
@@ -300,35 +294,25 @@ namespace GORE.Engine.Renderers
                         float wx = x * wallSize;
                         float wy = 0.0f;
                         float wz = y * wallSize;
-                        // For each face (N, S, W, E)
-                        for (int dir = 0; dir < 4; dir++)
+                        // Always draw all four vertical faces (N, S, W, E)
+                        for (int face = 0; face < 4; face++)
                         {
-                            int nx = x + dx[dir];
-                            int ny = y + dy[dir];
-                            bool drawFace = false;
-                            if (nx < 0 || nx >= mapW || ny < 0 || ny >= mapH)
-                                drawFace = true; // edge of map
-                            else if (CurrentMap.Grid[nx, ny] == 0)
-                                drawFace = true; // neighbor is empty
-                            if (drawFace)
+                            var model = Matrix4x4.CreateTranslation(wx, wy, wz);
+                            if (modelLoc != -1)
                             {
-                                var model = Matrix4x4.CreateTranslation(wx, wy, wz);
-                                if (modelLoc != -1)
-                                {
-                                    unsafe { _gl.UniformMatrix4(modelLoc, 1, false, (float*)&model); }
-                                }
-                                _gl.BindVertexArray(_vao);
-                                _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
-                                unsafe
-                                {
-                                    fixed (float* v = faceVertices[dir])
-                                        _gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(faceVertices[dir].Length * sizeof(float)), v, BufferUsageARB.DynamicDraw);
-                                    fixed (uint* i = quadIndices)
-                                        _gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(quadIndices.Length * sizeof(uint)), i, BufferUsageARB.DynamicDraw);
-                                }
-                                _gl.DrawElements(PrimitiveType.Triangles, 6, DrawElementsType.UnsignedInt, null);
-                                _gl.BindVertexArray(0);
+                                unsafe { _gl.UniformMatrix4(modelLoc, 1, false, (float*)&model); }
                             }
+                            _gl.BindVertexArray(_vao);
+                            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
+                            unsafe
+                            {
+                                fixed (float* v = faceVertices[face])
+                                    _gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(faceVertices[face].Length * sizeof(float)), v, BufferUsageARB.DynamicDraw);
+                                fixed (uint* i = quadIndices)
+                                    _gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(quadIndices.Length * sizeof(uint)), i, BufferUsageARB.DynamicDraw);
+                            }
+                            _gl.DrawElements(PrimitiveType.Triangles, 6, DrawElementsType.UnsignedInt, null);
+                            _gl.BindVertexArray(0);
                         }
                         if (texId != 0)
                             _gl.BindTexture(TextureTarget.Texture2D, 0);
