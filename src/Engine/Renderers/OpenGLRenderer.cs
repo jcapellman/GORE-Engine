@@ -206,63 +206,55 @@ namespace GORE.Engine.Renderers
                     _gl.UniformMatrix4(_gl.GetUniformLocation(_shaderProgram, "uProj"), 1, false, (float*)&proj);
                 }
                 // --- Floor and Ceiling Rendering ---
+                // --- Floor Rendering ---
                 float[] floorVertices = {
                     0f, 0f, 0f, 0f, 0f,
-                    wallSize, 0f, 0f, 1f, 0f,
-                    wallSize, 0f, wallSize, 1f, 1f,
-                    0f, 0f, wallSize, 0f, 1f
+                    mapW * wallSize, 0f, 0f, 1f, 0f,
+                    mapW * wallSize, 0f, mapH * wallSize, 1f, 1f,
+                    0f, 0f, mapH * wallSize, 0f, 1f
                 };
                 float[] ceilVertices = {
-                    0f, wallSize, 0f, 0f, 0f,
-                    wallSize, wallSize, 0f, 1f, 0f,
-                    wallSize, wallSize, wallSize, 1f, 1f,
-                    0f, wallSize, wallSize, 0f, 1f
+                    0f, 0f, 0f, 0f, 0f,
+                    mapW * wallSize, 0f, 0f, 1f, 0f,
+                    mapW * wallSize, 0f, mapH * wallSize, 1f, 1f,
+                    0f, 0f, mapH * wallSize, 0f, 1f
                 };
-                for (int y = 0; y < mapH; y++)
+                // Floor (single quad)
+                if (colorLoc != -1) _gl.Uniform4(colorLoc, 0.3f, 0.3f, 0.3f, 1.0f); // medium gray
+                var model = Matrix4x4.CreateTranslation(0f, -0.01f, 0f);
+                if (modelLoc != -1)
                 {
-                    for (int x = 0; x < mapW; x++)
-                    {
-                        float wx = x * wallSize;
-                        float wy = 0.0f;
-                        float wz = y * wallSize;
-                        // Floor (offset slightly down to avoid z-fighting)
-                        if (colorLoc != -1) _gl.Uniform4(colorLoc, 0.3f, 0.3f, 0.3f, 1.0f); // medium gray
-                        var model = Matrix4x4.CreateTranslation(wx, -0.01f, wz);
-                        if (modelLoc != -1)
-                        {
-                            unsafe { _gl.UniformMatrix4(modelLoc, 1, false, (float*)&model); }
-                        }
-                        _gl.BindVertexArray(_vao);
-                        _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
-                        unsafe
-                        {
-                            fixed (float* v = floorVertices)
-                                _gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(floorVertices.Length * sizeof(float)), v, BufferUsageARB.DynamicDraw);
-                            fixed (uint* i = quadIndices)
-                                _gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(quadIndices.Length * sizeof(uint)), i, BufferUsageARB.DynamicDraw);
-                        }
-                        _gl.DrawElements(PrimitiveType.Triangles, 6, DrawElementsType.UnsignedInt, null);
-                        _gl.BindVertexArray(0);
-                        // Ceiling (offset slightly up to avoid z-fighting)
-                        if (colorLoc != -1) _gl.Uniform4(colorLoc, 0.4f, 0.4f, 0.4f, 1.0f); // lighter gray for visibility
-                        model = Matrix4x4.CreateTranslation(wx, wallSize, wz);
-                        if (modelLoc != -1)
-                        {
-                            unsafe { _gl.UniformMatrix4(modelLoc, 1, false, (float*)&model); }
-                        }
-                        _gl.BindVertexArray(_vao);
-                        _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
-                        unsafe
-                        {
-                            fixed (float* v = ceilVertices)
-                                _gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(ceilVertices.Length * sizeof(float)), v, BufferUsageARB.DynamicDraw);
-                            fixed (uint* i = quadIndices)
-                                _gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(quadIndices.Length * sizeof(uint)), i, BufferUsageARB.DynamicDraw);
-                        }
-                        _gl.DrawElements(PrimitiveType.Triangles, 6, DrawElementsType.UnsignedInt, null);
-                        _gl.BindVertexArray(0);
-                    }
+                    unsafe { _gl.UniformMatrix4(modelLoc, 1, false, (float*)&model); }
                 }
+                _gl.BindVertexArray(_vao);
+                _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
+                unsafe
+                {
+                    fixed (float* v = floorVertices)
+                        _gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(floorVertices.Length * sizeof(float)), v, BufferUsageARB.DynamicDraw);
+                    fixed (uint* i = quadIndices)
+                        _gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(quadIndices.Length * sizeof(uint)), i, BufferUsageARB.DynamicDraw);
+                }
+                _gl.DrawElements(PrimitiveType.Triangles, 6, DrawElementsType.UnsignedInt, null);
+                _gl.BindVertexArray(0);
+                // Ceiling (single quad at correct height)
+                if (colorLoc != -1) _gl.Uniform4(colorLoc, 0.2f, 0.2f, 0.2f, 1.0f); // dark gray
+                var ceilingModel = Matrix4x4.CreateTranslation(0f, wallSize, 0f);
+                if (modelLoc != -1)
+                {
+                    unsafe { _gl.UniformMatrix4(modelLoc, 1, false, (float*)&ceilingModel); }
+                }
+                _gl.BindVertexArray(_vao);
+                _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
+                unsafe
+                {
+                    fixed (float* v = ceilVertices)
+                        _gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(ceilVertices.Length * sizeof(float)), v, BufferUsageARB.DynamicDraw);
+                    fixed (uint* i = quadIndices)
+                        _gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(quadIndices.Length * sizeof(uint)), i, BufferUsageARB.DynamicDraw);
+                }
+                _gl.DrawElements(PrimitiveType.Triangles, 6, DrawElementsType.UnsignedInt, null);
+                _gl.BindVertexArray(0);
                 // Wolf3D-style: Draw all exposed faces for each wall cell
                 float[][] faceVertices = new float[4][];
                 // North face (toward -Z)
@@ -321,10 +313,10 @@ namespace GORE.Engine.Renderers
                         {
                             if (faceVertices[face] == null)
                                 continue;
-                            var model = Matrix4x4.CreateTranslation(wx, wy, wz);
+                            var model2 = Matrix4x4.CreateTranslation(wx, wy, wz);
                             if (modelLoc != -1)
                             {
-                                unsafe { _gl.UniformMatrix4(modelLoc, 1, false, (float*)&model); }
+                                unsafe { _gl.UniformMatrix4(modelLoc, 1, false, (float*)&model2); }
                             }
                             if (texId != 0)
                                 _gl.BindTexture(TextureTarget.Texture2D, texId);
