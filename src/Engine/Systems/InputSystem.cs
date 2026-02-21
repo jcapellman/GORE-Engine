@@ -1,4 +1,4 @@
-using Windows.System;
+using Silk.NET.Input;
 
 namespace GORE.Engine
 {
@@ -13,32 +13,30 @@ namespace GORE.Engine
         public bool TurnRight { get; set; }
         public bool FireTriggerHeld { get; set; }
 
-        public void HandleKey(VirtualKey key, bool isPressed)
+        public void HandleKey(Key key, bool isPressed)
         {
             switch (key)
             {
-                case VirtualKey.W: MoveForward = isPressed; break;
-                case VirtualKey.S: MoveBackward = isPressed; break;
-                case VirtualKey.A: StrafeLeft = isPressed; break;
-                case VirtualKey.D: StrafeRight = isPressed; break;
-                case VirtualKey.Left: TurnLeft = isPressed; break;
-                case VirtualKey.Right: TurnRight = isPressed; break;
-                case VirtualKey.Control: FireTriggerHeld = isPressed; break;
-                case VirtualKey.Q:
-                    if (isPressed) PreviousWeaponRequested?.Invoke();
-                    break;
-                case VirtualKey.E:
-                    if (isPressed) NextWeaponRequested?.Invoke();
-                    break;
-                case VirtualKey.Number1:
-                case VirtualKey.Number2:
-                case VirtualKey.Number3:
-                case VirtualKey.Number4:
-                case VirtualKey.Number5:
-                case VirtualKey.Number6:
-                case VirtualKey.Number7:
-                case VirtualKey.Number8:
-                    if (isPressed) WeaponNumberKeyPressed?.Invoke((int)key - (int)VirtualKey.Number1);
+                case Key.W: MoveForward = isPressed; break;
+                case Key.S: MoveBackward = isPressed; break;
+                case Key.A: StrafeLeft = isPressed; break;
+                case Key.D: StrafeRight = isPressed; break;
+                case Key.Left: TurnLeft = isPressed; break;
+                case Key.Right: TurnRight = isPressed; break;
+                case Key.ControlLeft:
+                case Key.ControlRight:
+                    FireTriggerHeld = isPressed; break;
+                case Key.Q: if (isPressed) PreviousWeaponRequested?.Invoke(); break;
+                case Key.E: if (isPressed) NextWeaponRequested?.Invoke(); break;
+                case Key.Number1:
+                case Key.Number2:
+                case Key.Number3:
+                case Key.Number4:
+                case Key.Number5:
+                case Key.Number6:
+                case Key.Number7:
+                case Key.Number8:
+                    if (isPressed) WeaponNumberKeyPressed?.Invoke((int)key - (int)Key.Number1);
                     break;
             }
         }

@@ -16,6 +16,7 @@ namespace GORE.Engine
         {
             _config = new GameConfig("config.json", _resourceLoader);
             _config.LoadConfig();
+            RendererType = GetValue("renderer_type", "Win2D");
         }
 
         public GameConfig GetConfig()
@@ -105,5 +106,7 @@ namespace GORE.Engine
         {
             _config?.SaveConfig();
         }
+
+        public string RendererType { get; private set; } = "OpenGL"; // Default renderer
     }
 }

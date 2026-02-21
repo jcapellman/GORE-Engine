@@ -1,4 +1,4 @@
-using Microsoft.Graphics.Canvas;
+// using Microsoft.Graphics.Canvas;
 using System.Collections.Generic;
 
 namespace GORE.Engine
@@ -20,11 +20,11 @@ namespace GORE.Engine
         public float SpriteScale { get; set; }
         public bool InfiniteAmmo { get; set; }
 
-        // Sprite frames
-        public CanvasBitmap IdleFrame { get; set; }
-        public CanvasBitmap FireFrame { get; set; }
-        public CanvasBitmap FireAltFrame { get; set; }
-        public CanvasBitmap ReloadFrame { get; set; }
+        // Sprite frame file paths (for OpenGL texture loading)
+        // public CanvasBitmap IdleFrame { get; set; }
+        // public CanvasBitmap FireFrame { get; set; }
+        // public CanvasBitmap FireAltFrame { get; set; }
+        // public CanvasBitmap ReloadFrame { get; set; }
 
         // File paths for loading
         public string IdlePath { get; set; }

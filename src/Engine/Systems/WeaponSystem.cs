@@ -1,5 +1,5 @@
-using Microsoft.Graphics.Canvas;
-using Microsoft.Graphics.Canvas.UI.Xaml;
+// using Microsoft.Graphics.Canvas;
+// using Microsoft.Graphics.Canvas.UI.Xaml;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -183,69 +183,8 @@ namespace GORE.Engine
             System.Diagnostics.Debug.WriteLine("  Loaded 8 default weapons");
         }
 
-        /// <summary>
-        /// Load all weapon sprites asynchronously
-        /// </summary>
-        public async Task LoadWeaponSpritesAsync(CanvasDevice device)
-        {
-            var baseDirectory = AppContext.BaseDirectory;
-
-            System.Diagnostics.Debug.WriteLine($"=== Loading Weapon Sprites ===");
-            System.Diagnostics.Debug.WriteLine($"Base directory: {baseDirectory}");
-
-            foreach (var weapon in _weapons)
-            {
-                try
-                {
-                    System.Diagnostics.Debug.WriteLine($"\nWeapon {weapon.Id}: {weapon.Name}");
-
-                    // Load all 4 frames for each weapon using ResourceLoader
-                    if (!string.IsNullOrEmpty(weapon.IdlePath) && File.Exists(Path.Combine(baseDirectory, weapon.IdlePath)))
-                    {
-                        weapon.IdleFrame = await _resourceLoader.LoadTextureAsync(weapon.IdlePath, device);
-                        System.Diagnostics.Debug.WriteLine($"  ✓ Loaded idle frame");
-                    }
-                    else
-                    {
-                        System.Diagnostics.Debug.WriteLine($"  ✗ Missing: {weapon.IdlePath}");
-                    }
-
-                    if (!string.IsNullOrEmpty(weapon.FirePath) && File.Exists(Path.Combine(baseDirectory, weapon.FirePath)))
-                    {
-                        weapon.FireFrame = await _resourceLoader.LoadTextureAsync(weapon.FirePath, device);
-                        System.Diagnostics.Debug.WriteLine($"  ✓ Loaded fire frame");
-                    }
-                    else
-                    {
-                        System.Diagnostics.Debug.WriteLine($"  ✗ Missing: {weapon.FirePath}");
-                    }
-
-                    if (!string.IsNullOrEmpty(weapon.FireAltPath) && File.Exists(Path.Combine(baseDirectory, weapon.FireAltPath)))
-                    {
-                        weapon.FireAltFrame = await _resourceLoader.LoadTextureAsync(weapon.FireAltPath, device);
-                        System.Diagnostics.Debug.WriteLine($"  ✓ Loaded fire_alt frame");
-                    }
-                    else
-                    {
-                        System.Diagnostics.Debug.WriteLine($"  ✗ Missing: {weapon.FireAltPath}");
-                    }
-
-                    if (!string.IsNullOrEmpty(weapon.ReloadPath) && File.Exists(Path.Combine(baseDirectory, weapon.ReloadPath)))
-                    {
-                        weapon.ReloadFrame = await _resourceLoader.LoadTextureAsync(weapon.ReloadPath, device);
-                        System.Diagnostics.Debug.WriteLine($"  ✓ Loaded reload frame");
-                    }
-                    else
-                    {
-                        System.Diagnostics.Debug.WriteLine($"  ✗ Missing: {weapon.ReloadPath}");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"  ✗ Error loading weapon sprites: {ex.Message}");
-                }
-            }
-        }
+        // No-op for OpenGL: weapon sprite loading is handled by OpenGL texture system
+        public async System.Threading.Tasks.Task LoadWeaponSpritesAsync(object device) { await System.Threading.Tasks.Task.CompletedTask; }
 
         /// <summary>
         /// Switch to a specific weapon by index (0-7)
@@ -357,49 +296,13 @@ namespace GORE.Engine
         /// <summary>
         /// Get the current frame to render based on animation state
         /// </summary>
-        public CanvasBitmap GetCurrentFrame()
-        {
-            var weapon = CurrentWeapon;
-
-            return _animationState switch
-            {
-                WeaponAnimationState.Idle => weapon.IdleFrame,
-                WeaponAnimationState.Firing => 
-                    // Alternate between fire frames for muzzle flash effect
-                    (_animationTimer > FIRE_ANIM_DURATION * 0.5f) ? weapon.FireFrame : weapon.FireAltFrame,
-                WeaponAnimationState.Reloading => weapon.ReloadFrame,
-                _ => weapon.IdleFrame
-            };
-        }
+        // No-op for OpenGL: frame selection is handled by OpenGL renderer
+        public void GetCurrentFrame() { }
 
         /// <summary>
         /// Render the current weapon sprite on screen
         /// </summary>
-        public void Render(CanvasDrawingSession session, float screenWidth, float screenHeight)
-        {
-            var frame = GetCurrentFrame();
-            if (frame == null)
-            {
-                // Only log once per second to avoid spam
-                if (_frameCount % 60 == 0)
-                {
-                    System.Diagnostics.Debug.WriteLine($"⚠ Weapon render: frame is NULL for weapon {CurrentWeapon.Id} ({CurrentWeapon.Name}) in state {_animationState}");
-                }
-                return;
-            }
-
-            // Use weapon's configured sprite scale
-            float weaponScale = CurrentWeapon.SpriteScale;
-            float weaponWidth = (float)frame.Size.Width * weaponScale;
-            float weaponHeight = (float)frame.Size.Height * weaponScale;
-
-            float x = (screenWidth - weaponWidth) / 2f;
-            float y = screenHeight - weaponHeight;
-
-            // Draw weapon sprite with destination rectangle for proper scaling
-            var destRect = new Windows.Foundation.Rect(x, y, weaponWidth, weaponHeight);
-            session.DrawImage(frame, destRect, new Windows.Foundation.Rect(0, 0, frame.Size.Width, frame.Size.Height), 1.0f, CanvasImageInterpolation.NearestNeighbor);
-        }
+        public void Render(object session, float screenWidth, float screenHeight) { }
 
         /// <summary>
         /// Get weapon by index
@@ -423,16 +326,7 @@ namespace GORE.Engine
         /// <summary>
         /// Dispose all weapon sprites
         /// </summary>
-        public void Dispose()
-        {
-            foreach (var weapon in _weapons)
-            {
-                weapon.IdleFrame?.Dispose();
-                weapon.FireFrame?.Dispose();
-                weapon.FireAltFrame?.Dispose();
-                weapon.ReloadFrame?.Dispose();
-            }
-        }
+        public void Dispose() { }
     }
 
     /// <summary>

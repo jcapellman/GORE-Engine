@@ -1,7 +1,4 @@
 
-using Microsoft.UI.Xaml;
-using Microsoft.UI.Windowing;
-using WinRT.Interop;
 using System;
 using System.Threading.Tasks;
 using GORE.Engine.Systems;
@@ -20,15 +17,34 @@ namespace GORE.Engine
         /// </summary>
         public static async Task<GOREEngineInstance> CreateAndInitializeAsync(Action<string> log, Action<string> logError)
         {
-            // Dependency injection: create shared ResourceLoader and all systems
+            // 90s-style loading screen
+            log("GORE Engine Build v0.9 - Initializing...");
+            await Task.Delay(300);
+
+            log("[1/5] Loading resources...");
             var resourceLoader = new Systems.ResourceLoader();
+            await Task.Delay(250);
+
+            log("[2/5] Loading config...");
             var configSystem = new ConfigSystem(resourceLoader);
             configSystem.Load();
+            await Task.Delay(250);
+
+            log("[3/5] Loading maps...");
             var mapSystem = new MapSystem(resourceLoader);
+            await Task.Delay(250);
+
+            log("[4/5] Loading weapons...");
             var weaponSystem = new WeaponSystem(resourceLoader);
+            await Task.Delay(250);
+
+            log("[5/5] Initializing renderer...");
             var dummyRaycast = new RaycastEngine(new int[1, 1], null);
             var rendererSystem = new RendererSystem(resourceLoader);
             rendererSystem.Initialize(640, 480, dummyRaycast);
+            await Task.Delay(250);
+
+            log("All systems initialized!");
 
             var instance = new GOREEngineInstance(
                 configSystem,

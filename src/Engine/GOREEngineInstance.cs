@@ -1,7 +1,6 @@
 using System;
 using System.Threading.Tasks;
 using GORE.Engine.Systems;
-using Microsoft.UI.Xaml;
 
 namespace GORE.Engine
 {

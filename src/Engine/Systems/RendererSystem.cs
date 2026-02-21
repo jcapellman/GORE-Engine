@@ -1,43 +1,53 @@
-using Microsoft.Graphics.Canvas;
-using Microsoft.Graphics.Canvas.UI.Xaml;
 using System;
 using System.Threading.Tasks;
+using GORE.Engine.Renderers;
 
 namespace GORE.Engine
 {
     /// <summary>
-    /// Thin wrapper around Renderer3D to allow future separation and testing.
+    /// Wrapper/factory for IRenderer, selects implementation based on config.
     /// </summary>
     public class RendererSystem : IDisposable
     {
-        private Renderer3D _renderer;
-        private RaycastEngine _raycastEngine;
-        private readonly GORE.Engine.Systems.ResourceLoader _resourceLoader;
+        private IRenderer _renderer;
+        private readonly Systems.ResourceLoader _resourceLoader;
+        private string _rendererType;
 
-        public RendererSystem(GORE.Engine.Systems.ResourceLoader resourceLoader)
+        public RendererSystem(Systems.ResourceLoader resourceLoader, string rendererType = "OpenGL")
         {
             _resourceLoader = resourceLoader;
+            _rendererType = rendererType;
         }
 
         public void Initialize(int width, int height, RaycastEngine raycastEngine)
         {
-            _raycastEngine = raycastEngine;
-            _renderer = new Renderer3D(width, height, raycastEngine, _resourceLoader);
+            _renderer = new OpenGLRenderer(_resourceLoader);
+            _renderer.Initialize(width, height, raycastEngine);
         }
 
-        public void InitializeResources(CanvasDevice device, int canvasWidth, int canvasHeight)
+        public void InitializeResources(object device, int canvasWidth, int canvasHeight)
         {
             _renderer?.InitializeResources(device, canvasWidth, canvasHeight);
         }
 
         public object GetRenderTarget() => _renderer?.GetRenderTarget();
 
-        public void Render(Microsoft.Graphics.Canvas.CanvasDrawingSession session, float width, float height)
+
+        public void Render(object drawingSession, float width, float height)
         {
-            _renderer?.Render(session, width, height);
+            _renderer?.Render(drawingSession, width, height);
         }
 
-        public Task LoadTextureAsync(int id, string path, CanvasDevice device)
+        public void Render(object drawingSession, float width, float height, float dt)
+        {
+            // Only OpenGLRenderer supports dt, so cast and call
+            if (_renderer is OpenGLRenderer ogl)
+                ogl.Render(drawingSession, width, height, dt);
+            else
+                _renderer?.Render(drawingSession, width, height);
+        }
+
+        public Task LoadTextureAsync(int id, string path, object device)
         {
             if (_renderer == null) throw new InvalidOperationException("Renderer not initialized");
             return _renderer.LoadTextureAsync(id, path, device);

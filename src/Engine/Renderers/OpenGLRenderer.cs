@@ -1,0 +1,429 @@
+using Silk.NET.OpenGL;
+using System;
+using System.Numerics;
+using System.Threading.Tasks;
+using GORE.Engine.Systems;
+using System.Linq;
+
+namespace GORE.Engine.Renderers
+{
+    // Minimal OpenGL 3D renderer for ANGLE/WinUI3 integration
+    public class OpenGLRenderer : IRenderer
+    {
+        // Returns the camera's forward direction as a unit vector
+        private Vector3 GetCameraForward()
+        {
+            float y = MathF.Sin(_pitch);
+            float x = MathF.Sin(_yaw) * MathF.Cos(_pitch);
+            float z = MathF.Cos(_yaw) * MathF.Cos(_pitch);
+            return Vector3.Normalize(new Vector3(x, y, z));
+        }
+        private readonly System.Collections.Generic.Dictionary<int, uint> _wallTextures = new();
+        public GORE.Engine.MapData CurrentMap { get; set; }
+        private Silk.NET.Input.IKeyboard _keyboard;
+        public void SetKeyboard(Silk.NET.Input.IKeyboard keyboard) => _keyboard = keyboard;
+        private GL _gl;
+        private uint _vao, _vbo, _ebo, _shaderProgram;
+        private int _width, _height;
+        private bool _initialized;
+
+        // Cube vertices (position, texcoord)
+        private readonly float[] _vertices = {
+            // positions        // texcoords
+            -1, -1, -1,  0, 0,
+             1, -1, -1,  1, 0,
+             1,  1, -1,  1, 1,
+            -1,  1, -1,  0, 1,
+            -1, -1,  1,  0, 0,
+             1, -1,  1,  1, 0,
+             1,  1,  1,  1, 1,
+            -1,  1,  1,  0, 1,
+        };
+        private readonly uint[] _indices = {
+            0,1,2, 2,3,0, // back
+            4,5,6, 6,7,4, // front
+            0,4,7, 7,3,0, // left
+            1,5,6, 6,2,1, // right
+            3,2,6, 6,7,3, // top
+            0,1,5, 5,4,0  // bottom
+        };
+
+        public OpenGLRenderer(ResourceLoader resourceLoader) { }
+
+        public void Initialize(int width, int height, RaycastEngine raycastEngine)
+        {
+            _width = width;
+            _height = height;
+            // _gl = ... (get Silk.NET GL context from ANGLE/EGL)
+            // For demo, assume _gl is valid and context is current
+            // You must set _gl from your context provider before calling Render
+        }
+
+        public void InitializeResources(object device, int canvasWidth, int canvasHeight)
+        {
+            // You must set _gl from your context provider here if not already set
+            if (_initialized) return;
+            // Example: _gl = Silk.NET.OpenGL.GL.GetApi(...);
+            if (_gl == null) return;
+
+            _vao = _gl.GenVertexArray();
+            _vbo = _gl.GenBuffer();
+            _ebo = _gl.GenBuffer();
+
+            _gl.BindVertexArray(_vao);
+            _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
+            unsafe
+            {
+                fixed (float* v = _vertices)
+                    _gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(_vertices.Length * sizeof(float)), v, BufferUsageARB.StaticDraw);
+            }
+            _gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, _ebo);
+            unsafe
+            {
+                fixed (uint* i = _indices)
+                    _gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(_indices.Length * sizeof(uint)), i, BufferUsageARB.StaticDraw);
+            }
+            _gl.EnableVertexAttribArray(0);
+            _gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 5 * sizeof(float), 0);
+            _gl.EnableVertexAttribArray(1);
+            _gl.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, 5 * sizeof(float), 3 * sizeof(float));
+            _gl.BindVertexArray(0);
+
+            _shaderProgram = CreateShaderProgram(_gl);
+            _initialized = true;
+
+            // Load all wall textures for the current map
+            if (CurrentMap != null && CurrentMap.TextureMapping != null)
+            {
+                foreach (var kvp in CurrentMap.TextureMapping)
+                {
+                    // Only load if not already loaded
+                    if (!_wallTextures.ContainsKey(kvp.Key))
+                    {
+                        // Synchronously wait for async method (safe here, only called once per texture)
+                        LoadTextureAsync(kvp.Key, kvp.Value, device).GetAwaiter().GetResult();
+                    }
+                }
+            }
+        }
+
+        public object GetRenderTarget() => null;
+
+        // --- First-person raycasting state ---
+        // 3D camera state
+        // Camera Y will be set to playerHeight (6 units)
+        private Vector3 _cameraPos = new Vector3(1.5f, 6.0f, 1.5f); // Player is 6 units tall, wall is 8 units
+        private float _yaw = 0f;   // radians
+        private float _pitch = 0f; // radians
+        private float _moveSpeed = 5.0f; // units/sec
+        private float _rotSpeed = 1.5f; // radians/sec
+
+
+        public unsafe void Render(object drawingSession, float width, float height, float dt = 1f/60f)
+        {
+            if (_gl == null) Console.WriteLine("GL context is null");
+            if (!_initialized) Console.WriteLine("Renderer not initialized");
+            if (CurrentMap == null) Console.WriteLine("CurrentMap is null");
+            if (CurrentMap?.Grid == null) Console.WriteLine("CurrentMap.Grid is null");
+            if (_gl == null || !_initialized) return;
+            _gl.Viewport(0, 0, (uint)width, (uint)height);
+            _gl.ClearColor(0.0f, 0.0f, 0.0f, 1.0f); // Black background
+            _gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+
+
+            // WASD/Arrow movement for 3D camera
+            if (_keyboard != null)
+            {
+                Vector3 forward = new Vector3((float)Math.Sin(_yaw), 0, (float)Math.Cos(_yaw));
+                Vector3 right = new Vector3(forward.Z, 0, -forward.X);
+                Vector3 move = Vector3.Zero;
+                if (_keyboard.IsKeyPressed(Silk.NET.Input.Key.W))
+                    move += forward;
+                if (_keyboard.IsKeyPressed(Silk.NET.Input.Key.S))
+                    move -= forward;
+                if (_keyboard.IsKeyPressed(Silk.NET.Input.Key.A))
+                    move -= right;
+                if (_keyboard.IsKeyPressed(Silk.NET.Input.Key.D))
+                    move += right;
+                if (move != Vector3.Zero)
+                {
+                    move = Vector3.Normalize(move);
+                    _cameraPos += move * _moveSpeed * dt;
+                }
+                // Arrow keys for looking
+                if (_keyboard.IsKeyPressed(Silk.NET.Input.Key.Left))
+                    _yaw += _rotSpeed * dt;
+                if (_keyboard.IsKeyPressed(Silk.NET.Input.Key.Right))
+                    _yaw -= _rotSpeed * dt;
+                if (_keyboard.IsKeyPressed(Silk.NET.Input.Key.Up))
+                    _pitch = Math.Clamp(_pitch - _rotSpeed * dt, -1.5f, 1.5f);
+                if (_keyboard.IsKeyPressed(Silk.NET.Input.Key.Down))
+                    _pitch = Math.Clamp(_pitch + _rotSpeed * dt, -1.5f, 1.5f);
+            }
+
+            // --- 3D map rendering ---
+            if (CurrentMap != null && CurrentMap.Grid != null)
+            {
+                int mapW = CurrentMap.Width;
+                int mapH = CurrentMap.Height;
+                _gl.UseProgram(_shaderProgram);
+                // Perspective projection
+                float aspect = width / height;
+                float fovY = MathF.PI / 3f; // 60 deg
+                float near = 0.01f, far = 100f; // Lower near plane to avoid clipping bottom of cubes
+                var proj = Matrix4x4.CreatePerspectiveFieldOfView(fovY, aspect, near, far);
+                // Camera view
+                Vector3 camTarget = _cameraPos + GetCameraForward();
+                var view = Matrix4x4.CreateLookAt(_cameraPos, camTarget, Vector3.UnitY);
+                float wallSize = 8.0f;
+                float playerHeight = 6.0f;
+                uint[] quadIndices = { 0, 1, 2, 2, 3, 0 };
+                int modelLoc = _gl.GetUniformLocation(_shaderProgram, "uModel");
+                int colorLoc = _gl.GetUniformLocation(_shaderProgram, "uFlatColor");
+                unsafe
+                {
+                    _gl.UniformMatrix4(_gl.GetUniformLocation(_shaderProgram, "uView"), 1, false, (float*)&view);
+                    _gl.UniformMatrix4(_gl.GetUniformLocation(_shaderProgram, "uProj"), 1, false, (float*)&proj);
+                }
+                // --- Floor and Ceiling Rendering ---
+                float[] floorVertices = {
+                    0f, 0f, 0f, 0f, 0f,
+                    wallSize, 0f, 0f, 1f, 0f,
+                    wallSize, 0f, wallSize, 1f, 1f,
+                    0f, 0f, wallSize, 0f, 1f
+                };
+                float[] ceilVertices = {
+                    0f, wallSize, 0f, 0f, 0f,
+                    wallSize, wallSize, 0f, 1f, 0f,
+                    wallSize, wallSize, wallSize, 1f, 1f,
+                    0f, wallSize, wallSize, 0f, 1f
+                };
+                for (int y = 0; y < mapH; y++)
+                {
+                    for (int x = 0; x < mapW; x++)
+                    {
+                        float wx = x * wallSize;
+                        float wy = 0.0f;
+                        float wz = y * wallSize;
+                        // Floor
+                        if (colorLoc != -1) _gl.Uniform4(colorLoc, 0.3f, 0.3f, 0.3f, 1.0f); // medium gray
+                        var model = Matrix4x4.CreateTranslation(wx, wy, wz);
+                        if (modelLoc != -1)
+                        {
+                            unsafe { _gl.UniformMatrix4(modelLoc, 1, false, (float*)&model); }
+                        }
+                        _gl.BindVertexArray(_vao);
+                        _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
+                        unsafe
+                        {
+                            fixed (float* v = floorVertices)
+                                _gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(floorVertices.Length * sizeof(float)), v, BufferUsageARB.DynamicDraw);
+                            fixed (uint* i = quadIndices)
+                                _gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(quadIndices.Length * sizeof(uint)), i, BufferUsageARB.DynamicDraw);
+                        }
+                        _gl.DrawElements(PrimitiveType.Triangles, 6, DrawElementsType.UnsignedInt, null);
+                        _gl.BindVertexArray(0);
+                        // Ceiling
+                        if (colorLoc != -1) _gl.Uniform4(colorLoc, 0.15f, 0.15f, 0.15f, 1.0f); // dark gray
+                        model = Matrix4x4.CreateTranslation(wx, wallSize, wz);
+                        if (modelLoc != -1)
+                        {
+                            unsafe { _gl.UniformMatrix4(modelLoc, 1, false, (float*)&model); }
+                        }
+                        _gl.BindVertexArray(_vao);
+                        _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
+                        unsafe
+                        {
+                            fixed (float* v = ceilVertices)
+                                _gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(ceilVertices.Length * sizeof(float)), v, BufferUsageARB.DynamicDraw);
+                            fixed (uint* i = quadIndices)
+                                _gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(quadIndices.Length * sizeof(uint)), i, BufferUsageARB.DynamicDraw);
+                        }
+                        _gl.DrawElements(PrimitiveType.Triangles, 6, DrawElementsType.UnsignedInt, null);
+                        _gl.BindVertexArray(0);
+                    }
+                }
+                // Wolf3D-style: Draw all exposed faces for each wall cell
+                float[][] faceVertices = new float[4][];
+                // North face (toward -Z)
+                faceVertices[0] = new float[] {
+                    0f, 0f, 0f, 0f, 0f,
+                    wallSize, 0f, 0f, 1f, 0f,
+                    wallSize, wallSize, 0f, 1f, 1f,
+                    0f, wallSize, 0f, 0f, 1f
+                };
+                // South face (toward +Z)
+                faceVertices[1] = new float[] {
+                    0f, 0f, wallSize, 0f, 0f,
+                    wallSize, 0f, wallSize, 1f, 0f,
+                    wallSize, wallSize, wallSize, 1f, 1f,
+                    0f, wallSize, wallSize, 0f, 1f
+                };
+                // West face (toward -X)
+                faceVertices[2] = new float[] {
+                    0f, 0f, wallSize, 0f, 0f,
+                    0f, 0f, 0f, 1f, 0f,
+                    0f, wallSize, 0f, 1f, 1f,
+                    0f, wallSize, wallSize, 0f, 1f
+                };
+                // East face (toward +X)
+                faceVertices[3] = new float[] {
+                    wallSize, 0f, wallSize, 0f, 0f,
+                    wallSize, 0f, 0f, 1f, 0f,
+                    wallSize, wallSize, 0f, 1f, 1f,
+                    wallSize, wallSize, wallSize, 0f, 1f
+                };
+                int[] dx = { 0, 0, -1, 1 };
+                int[] dy = { -1, 1, 0, 0 };
+                for (int y = 0; y < mapH; y++)
+                {
+                    for (int x = 0; x < mapW; x++)
+                    {
+                        int wallType = CurrentMap.Grid[x, y];
+                        if (wallType == 0) continue;
+                        uint texId = 0;
+                        _wallTextures.TryGetValue(wallType, out texId);
+                        if (texId != 0)
+                        {
+                            _gl.BindTexture(TextureTarget.Texture2D, texId);
+                            if (colorLoc != -1) _gl.Uniform4(colorLoc, 0f, 0f, 0f, 0f);
+                        }
+                        else
+                        {
+                            Console.WriteLine($"Warning: No texture for wall type {wallType}, using blue fallback");
+                            if (colorLoc != -1) _gl.Uniform4(colorLoc, 0.2f, 0.2f, 0.8f, 1f);
+                        }
+                        float wx = x * wallSize;
+                        float wy = 0.0f;
+                        float wz = y * wallSize;
+                        // For each face (N, S, W, E)
+                        for (int dir = 0; dir < 4; dir++)
+                        {
+                            int nx = x + dx[dir];
+                            int ny = y + dy[dir];
+                            bool drawFace = false;
+                            if (nx < 0 || nx >= mapW || ny < 0 || ny >= mapH)
+                                drawFace = true; // edge of map
+                            else if (CurrentMap.Grid[nx, ny] == 0)
+                                drawFace = true; // neighbor is empty
+                            if (drawFace)
+                            {
+                                var model = Matrix4x4.CreateTranslation(wx, wy, wz);
+                                if (modelLoc != -1)
+                                {
+                                    unsafe { _gl.UniformMatrix4(modelLoc, 1, false, (float*)&model); }
+                                }
+                                _gl.BindVertexArray(_vao);
+                                _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
+                                unsafe
+                                {
+                                    fixed (float* v = faceVertices[dir])
+                                        _gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(faceVertices[dir].Length * sizeof(float)), v, BufferUsageARB.DynamicDraw);
+                                    fixed (uint* i = quadIndices)
+                                        _gl.BufferData(BufferTargetARB.ElementArrayBuffer, (nuint)(quadIndices.Length * sizeof(uint)), i, BufferUsageARB.DynamicDraw);
+                                }
+                                _gl.DrawElements(PrimitiveType.Triangles, 6, DrawElementsType.UnsignedInt, null);
+                                _gl.BindVertexArray(0);
+                            }
+                        }
+                        if (texId != 0)
+                            _gl.BindTexture(TextureTarget.Texture2D, 0);
+                    }
+                }
+                _gl.UseProgram(0);
+            }
+        }
+
+        // Satisfy IRenderer interface
+        public void Render(object drawingSession, float width, float height)
+        {
+            Render(drawingSession, width, height, 1f / 60f);
+        }
+
+        public async Task LoadTextureAsync(int id, string path, object device)
+        {
+            if (_gl == null) return;
+            if (string.IsNullOrWhiteSpace(path)) return;
+            if (_wallTextures.ContainsKey(id)) return;
+            try
+            {
+                Console.WriteLine($"Loading texture for wall type {id}: {path}");
+                uint tex = ImageLoader.LoadTexture2D(_gl, path);
+                _wallTextures[id] = tex;
+                Console.WriteLine($"Loaded texture {path} as GL id {tex}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed to load texture {path}: {ex.Message}");
+            }
+        }
+
+        public void Dispose()
+        {
+            if (_gl == null) return;
+            _gl.DeleteVertexArray(_vao);
+            _gl.DeleteBuffer(_vbo);
+            _gl.DeleteBuffer(_ebo);
+            _gl.DeleteProgram(_shaderProgram);
+        }
+
+        // --- Helper methods for shader setup ---
+        private static uint CreateShaderProgram(GL gl)
+        {
+            string vert = @"#version 300 es
+layout(location = 0) in vec3 aPos;
+layout(location = 1) in vec2 aTexCoord;
+uniform mat4 uView;
+uniform mat4 uProj;
+uniform mat4 uModel;
+out vec2 vTexCoord;
+void main() {
+    gl_Position = uProj * uView * uModel * vec4(aPos, 1.0);
+    vTexCoord = aTexCoord;
+}";
+            string frag = @"#version 300 es
+precision mediump float;
+in vec2 vTexCoord;
+uniform sampler2D uWallTex;
+uniform vec4 uFlatColor;
+out vec4 FragColor;
+void main() {
+    // Always reference both uniforms to avoid optimization out
+    vec4 texColor = texture(uWallTex, vTexCoord);
+    vec4 flatColor = uFlatColor;
+    FragColor = (flatColor.a > 0.99) ? flatColor : texColor;
+}";
+            uint vs = gl.CreateShader(ShaderType.VertexShader);
+            gl.ShaderSource(vs, vert);
+            gl.CompileShader(vs);
+            int vStatus = gl.GetShader(vs, Silk.NET.OpenGL.ShaderParameterName.CompileStatus);
+            if (vStatus == 0)
+            {
+                string vLog = gl.GetShaderInfoLog(vs);
+                Console.WriteLine("Vertex shader compile error:\n" + vLog);
+            }
+            uint fs = gl.CreateShader(ShaderType.FragmentShader);
+            gl.ShaderSource(fs, frag);
+            gl.CompileShader(fs);
+            int fStatus = gl.GetShader(fs, Silk.NET.OpenGL.ShaderParameterName.CompileStatus);
+            if (fStatus == 0)
+            {
+                string fLog = gl.GetShaderInfoLog(fs);
+                Console.WriteLine("Fragment shader compile error:\n" + fLog);
+            }
+            uint prog = gl.CreateProgram();
+            gl.AttachShader(prog, vs);
+            gl.AttachShader(prog, fs);
+            gl.LinkProgram(prog);
+            int linkStatus = gl.GetProgram(prog, Silk.NET.OpenGL.ProgramPropertyARB.LinkStatus);
+            if (linkStatus == 0)
+            {
+                string pLog = gl.GetProgramInfoLog(prog);
+                Console.WriteLine("Shader program link error:\n" + pLog);
+            }
+            gl.DeleteShader(vs);
+            gl.DeleteShader(fs);
+            return prog;
+        }
+    }
+}
