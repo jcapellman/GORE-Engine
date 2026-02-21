@@ -121,15 +121,31 @@ namespace GORE.Engine.Renderers
 
         public unsafe void Render(object drawingSession, float width, float height, float dt = 1f/60f)
         {
+            // Robust null checks to prevent NullReferenceException
+            if (_gl == null)
+            {
+                Console.WriteLine("GL context is null");
+                return;
+            }
+            if (!_initialized)
+            {
+                Console.WriteLine("Renderer not initialized");
+                return;
+            }
+            if (CurrentMap == null)
+            {
+                Console.WriteLine("CurrentMap is null");
+                return;
+            }
+            if (CurrentMap.Grid == null)
+            {
+                Console.WriteLine("CurrentMap.Grid is null");
+                return;
+            }
             // Ensure correct OpenGL state for opaque geometry
             _gl.Enable(Silk.NET.OpenGL.EnableCap.DepthTest);
             _gl.DepthMask(true);
             _gl.Disable(Silk.NET.OpenGL.EnableCap.Blend);
-            if (_gl == null) Console.WriteLine("GL context is null");
-            if (!_initialized) Console.WriteLine("Renderer not initialized");
-            if (CurrentMap == null) Console.WriteLine("CurrentMap is null");
-            if (CurrentMap?.Grid == null) Console.WriteLine("CurrentMap.Grid is null");
-            if (_gl == null || !_initialized) return;
             _gl.Viewport(0, 0, (uint)width, (uint)height);
             _gl.ClearColor(0.0f, 0.0f, 0.0f, 1.0f); // Black background
             _gl.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
@@ -297,11 +313,15 @@ namespace GORE.Engine.Renderers
                         // Always draw all four vertical faces (N, S, W, E)
                         for (int face = 0; face < 4; face++)
                         {
+                            if (faceVertices[face] == null)
+                                continue;
                             var model = Matrix4x4.CreateTranslation(wx, wy, wz);
                             if (modelLoc != -1)
                             {
                                 unsafe { _gl.UniformMatrix4(modelLoc, 1, false, (float*)&model); }
                             }
+                            if (texId != 0)
+                                _gl.BindTexture(TextureTarget.Texture2D, texId);
                             _gl.BindVertexArray(_vao);
                             _gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
                             unsafe
