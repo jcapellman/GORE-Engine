@@ -57,5 +57,21 @@ namespace GORE.Engine.Systems
             }
             return missingTextures;
         }
+
+        /// <summary>
+        /// Checks if a given (x, y) position is walkable (not a wall or closed door).
+        /// </summary>
+        public bool IsWalkable(float x, float y)
+        {
+            if (CurrentMap == null || CurrentMap.Grid == null)
+                return false;
+            int mapX = (int)x;
+            int mapY = (int)y;
+            if (mapX < 0 || mapX >= CurrentMap.Width || mapY < 0 || mapY >= CurrentMap.Height)
+                return false;
+            int cellValue = CurrentMap.Grid[mapY, mapX];
+            // 0 = empty, 5 = door (optionally allow if open), others = wall
+            return cellValue == 0;
+        }
     }
 }

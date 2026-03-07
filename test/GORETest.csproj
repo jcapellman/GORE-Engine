@@ -8,13 +8,12 @@
     <PlatformTarget>ARM64</PlatformTarget>
   </PropertyGroup>
 
-  <!-- Wolf3D Textures and Maps -->
   <ItemGroup>
 	<Content Include="gt1\textures\*.jpg">
-	  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  <CopyToOutputDirectory>Always</CopyToOutputDirectory>
 	</Content>
 	<Content Include="gt1\textures\*.png">
-	  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  <CopyToOutputDirectory>Always</CopyToOutputDirectory>
 	</Content>
 	<Content Include="gt1\maps\*.map">
 	  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

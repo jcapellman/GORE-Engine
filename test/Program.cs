@@ -34,8 +34,23 @@ namespace GORETest
                 err => Console.Error.WriteLine(err)
             );
 
+
             // Load E1M1 map
             await engine.MapSystem.LoadMapByNameAsync("e1m1");
+
+            // Verify all textures exist before starting
+            var missingTextures = engine.MapSystem.VerifyTextures(engine.MapSystem.CurrentMap);
+            if (missingTextures.Count > 0)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("ERROR: The following textures are missing:");
+                foreach (var tex in missingTextures)
+                    Console.WriteLine(tex);
+                Console.ResetColor();
+                Console.WriteLine("Game cannot start due to missing textures. Press any key to exit.");
+                Console.ReadKey();
+                return;
+            }
 
             // OpenGL window using Silk.NET.Windowing
             var options = WindowOptions.Default;
@@ -50,36 +65,54 @@ namespace GORETest
 
             window.Load += () =>
             {
-                gl = GL.GetApi(window);
-                input = window.CreateInput();
-                // Escape key handler to close window
-                if (input != null && input.Keyboards.Count > 0)
+                try
                 {
-                    var keyboard = input.Keyboards[0];
-                    keyboard.KeyDown += (kb, key, modifiers) =>
+                    gl = GL.GetApi(window);
+                    input = window.CreateInput();
+                    // Escape key handler to close window
+                    if (input != null && input.Keyboards.Count > 0)
                     {
-                        if (key == Silk.NET.Input.Key.Escape)
-                            window.Close();
-                    };
+                        var keyboard = input.Keyboards[0];
+                        keyboard.KeyDown += (kb, key, modifiers) =>
+                        {
+                            if (key == Silk.NET.Input.Key.Escape)
+                                window.Close();
+                        };
+                    }
+                    // Get the actual OpenGLRenderer instance from RendererSystem
+                    var oglRendererField = engine.RendererSystem.GetType().GetField("_renderer", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                    var oglRenderer = oglRendererField?.GetValue(engine.RendererSystem) as GORE.Engine.Renderers.OpenGLRenderer;
+                    if (oglRenderer != null)
+                    {
+                        // Set GL context
+                        var glField = oglRenderer.GetType().GetField("_gl", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                        if (glField != null) glField.SetValue(oglRenderer, gl);
+
+                        // Set map
+                        oglRenderer.CurrentMap = engine.MapSystem.CurrentMap;
+
+                        // Set keyboard
+                        var keyboard = input.Keyboards.Count > 0 ? input.Keyboards[0] : null;
+                        oglRenderer.SetKeyboard(keyboard);
+
+                        // Initialize resources (important!)
+                        // This will throw an exception if any texture fails to load
+                        oglRenderer.InitializeResources(null, window.Size.X, window.Size.Y);
+                    }
                 }
-                // Get the actual OpenGLRenderer instance from RendererSystem
-                var oglRendererField = engine.RendererSystem.GetType().GetField("_renderer", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                var oglRenderer = oglRendererField?.GetValue(engine.RendererSystem) as GORE.Engine.Renderers.OpenGLRenderer;
-                if (oglRenderer != null)
+                catch (Exception ex)
                 {
-                    // Set GL context
-                    var glField = oglRenderer.GetType().GetField("_gl", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-                    if (glField != null) glField.SetValue(oglRenderer, gl);
-
-                    // Set map
-                    oglRenderer.CurrentMap = engine.MapSystem.CurrentMap;
-
-                    // Set keyboard
-                    var keyboard = input.Keyboards.Count > 0 ? input.Keyboards[0] : null;
-                    oglRenderer.SetKeyboard(keyboard);
-
-                    // Initialize resources (important!)
-                    oglRenderer.InitializeResources(null, window.Size.X, window.Size.Y);
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"\nFATAL ERROR during initialization: {ex.Message}");
+                    if (ex.InnerException != null)
+                    {
+                        Console.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                    }
+                    Console.ResetColor();
+                    Console.WriteLine("\nPress any key to exit.");
+                    Console.ReadKey();
+                    window.Close();
+                    Environment.Exit(1);
                 }
             };
 
@@ -87,6 +120,8 @@ namespace GORETest
             {
                 // Render the map (pass delta for frame timing)
                 engine.RendererSystem.Render(null, window.Size.X, window.Size.Y, (float)delta);
+                // Update FPS counter in HUD
+                engine.HudSystem.UpdateFPS((float)delta);
             };
 
             window.Run();

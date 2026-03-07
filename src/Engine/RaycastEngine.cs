@@ -11,6 +11,7 @@ namespace GORE.Engine
         private readonly int[,] _worldMap;
         private readonly int _mapWidth;
         private readonly int _mapHeight;
+        private readonly GORE.Engine.Systems.MapSystem _mapSystem;
         private readonly Dictionary<(int, int), DoorState> _doors;
         private const int DOOR_TEXTURE_ID = 5; // Doors use texture ID 5
         private const float DOOR_OPEN_SPEED = 2.0f;
@@ -22,13 +23,15 @@ namespace GORE.Engine
 
         private readonly EventSystem _eventSystem;
 
-        public RaycastEngine(int[,] worldMap, EventSystem eventSystem = null)
+
+        public RaycastEngine(int[,] worldMap, GORE.Engine.Systems.MapSystem mapSystem, EventSystem eventSystem = null)
         {
             _worldMap = worldMap;
             _mapHeight = worldMap.GetLength(0);
             _mapWidth = worldMap.GetLength(1);
             _doors = new Dictionary<(int, int), DoorState>();
             _eventSystem = eventSystem;
+            _mapSystem = mapSystem;
 
             // Find all doors in the map and initialize their state
             for (int y = 0; y < _mapHeight; y++)
@@ -182,26 +185,10 @@ namespace GORE.Engine
             float moveSpeed = 3.0f * deltaTime;
             Vector2 newPos = PlayerPosition + movement * moveSpeed;
 
-            // Collision detection
-            int mapX = (int)newPos.X;
-            int mapY = (int)newPos.Y;
-
-            if (mapX >= 0 && mapX < _mapWidth && mapY >= 0 && mapY < _mapHeight)
+            // Use MapSystem for collision detection
+            if (_mapSystem != null && _mapSystem.IsWalkable(newPos.X, newPos.Y))
             {
-                int cellValue = _worldMap[mapY, mapX];
-
-                // Allow movement through empty cells
-                if (cellValue == 0)
-                {
-                    PlayerPosition = newPos;
-                }
-                // Allow movement through open doors (90% or more open)
-                else if (cellValue == DOOR_TEXTURE_ID && 
-                         _doors.TryGetValue((mapX, mapY), out var doorState) &&
-                         doorState.OpenAmount >= 0.9f)
-                {
-                    PlayerPosition = newPos;
-                }
+                PlayerPosition = newPos;
             }
         }
 

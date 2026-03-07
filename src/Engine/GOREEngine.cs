@@ -18,7 +18,7 @@ namespace GORE.Engine
         public static async Task<GOREEngineInstance> CreateAndInitializeAsync(Action<string> log, Action<string> logError)
         {
             // 90s-style loading screen
-            log("GORE Engine Build v0.9 - Initializing...");
+            log("GORE Engine (VERSION 2026.2.0)");
             await Task.Delay(300);
 
             log("[1/5] Loading resources...");
@@ -39,9 +39,11 @@ namespace GORE.Engine
             await Task.Delay(250);
 
             log("[5/5] Initializing renderer...");
-            var dummyRaycast = new RaycastEngine(new int[1, 1], null);
+            // Load initial map to get grid
+            await mapSystem.LoadMapByNameAsync("e1m1"); // Or use a config/default
+            var raycastEngine = new RaycastEngine(mapSystem.CurrentMap.Grid, mapSystem);
             var rendererSystem = new RendererSystem(resourceLoader);
-            rendererSystem.Initialize(640, 480, dummyRaycast);
+            rendererSystem.Initialize(640, 480, raycastEngine);
             await Task.Delay(250);
 
             log("All systems initialized!");
@@ -54,6 +56,7 @@ namespace GORE.Engine
                 log,
                 logError
             );
+            instance.RaycastEngine = raycastEngine;
             // Optionally, you could add further async initialization here if needed
             return instance;
         }

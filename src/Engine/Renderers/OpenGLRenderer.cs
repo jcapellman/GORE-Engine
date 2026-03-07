@@ -1,5 +1,6 @@
 using Silk.NET.OpenGL;
 using System;
+using System.IO;
 using System.Numerics;
 using System.Threading.Tasks;
 using GORE.Engine.Systems;
@@ -8,7 +9,7 @@ using System.Linq;
 namespace GORE.Engine.Renderers
 {
     // Minimal OpenGL 3D renderer for ANGLE/WinUI3 integration
-    public class OpenGLRenderer : IRenderer
+    public class OpenGLRenderer : IRenderer, IDisposable
     {
         // Returns the camera's forward direction as a unit vector
         private Vector3 GetCameraForward()
@@ -95,15 +96,27 @@ namespace GORE.Engine.Renderers
             // Load all wall textures for the current map
             if (CurrentMap != null && CurrentMap.TextureMapping != null)
             {
+                Console.WriteLine($"[TextureLoader] Loading {CurrentMap.TextureMapping.Count} textures for map '{CurrentMap.Name}'...");
                 foreach (var kvp in CurrentMap.TextureMapping)
                 {
                     // Only load if not already loaded
                     if (!_wallTextures.ContainsKey(kvp.Key))
                     {
-                        // Synchronously wait for async method (safe here, only called once per texture)
-                        LoadTextureAsync(kvp.Key, kvp.Value, device).GetAwaiter().GetResult();
+                        try
+                        {
+                            // Synchronously wait for async method (safe here, only called once per texture)
+                            LoadTextureAsync(kvp.Key, kvp.Value, device).GetAwaiter().GetResult();
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.ForegroundColor = ConsoleColor.Red;
+                            Console.WriteLine($"[TextureLoader] FATAL ERROR: {ex.Message}");
+                            Console.ResetColor();
+                            throw new Exception($"Texture loading failed. Game cannot start.", ex);
+                        }
                     }
                 }
+                Console.WriteLine($"[TextureLoader] All {_wallTextures.Count} textures loaded successfully.");
             }
         }
 
@@ -348,19 +361,35 @@ namespace GORE.Engine.Renderers
 
         public async Task LoadTextureAsync(int id, string path, object device)
         {
-            if (_gl == null) return;
-            if (string.IsNullOrWhiteSpace(path)) return;
+            if (_gl == null) 
+                throw new InvalidOperationException("OpenGL context is not initialized");
+            if (string.IsNullOrWhiteSpace(path)) 
+                throw new ArgumentException("Texture path cannot be null or empty", nameof(path));
             if (_wallTextures.ContainsKey(id)) return;
+
+            // Print the full resolved path for diagnostics
+            var baseDirectory = AppContext.BaseDirectory;
+            var resolvedPath = System.IO.Path.Combine(baseDirectory, path);
+            Console.WriteLine($"[TextureLoader] Wall type {id}: requested '{path}', resolved '{resolvedPath}'");
+
+            if (!System.IO.File.Exists(resolvedPath))
+            {
+                throw new FileNotFoundException($"Texture file not found for wall type {id}: {resolvedPath}", resolvedPath);
+            }
+
             try
             {
-                Console.WriteLine($"Loading texture for wall type {id}: {path}");
-                uint tex = ImageLoader.LoadTexture2D(_gl, path);
+                uint tex = ImageLoader.LoadTexture2D(_gl, resolvedPath);
+                if (tex == 0)
+                {
+                    throw new Exception($"Failed to create OpenGL texture for wall type {id}: {resolvedPath}");
+                }
                 _wallTextures[id] = tex;
-                Console.WriteLine($"Loaded texture {path} as GL id {tex}");
+                Console.WriteLine($"[TextureLoader] Successfully loaded texture for wall type {id} as GL id {tex}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to load texture {path}: {ex.Message}");
+                throw new Exception($"Failed to load texture for wall type {id} from '{resolvedPath}': {ex.Message}", ex);
             }
         }
 
